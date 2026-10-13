@@ -3,7 +3,7 @@ import { db } from "./db";
 import { HttpError } from "./auth";
 import { dayDate, dayKey, nextDay } from "./dates";
 import { mutationSchema, type DayView, type AssignmentView } from "./types";
-import { rangeSchema } from "./quran";
+import { rangeSchema, pageAmount } from "./quran";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
@@ -121,6 +121,8 @@ export async function getDay(
         endSurah: e.endSurah,
         endAyah: e.endAyah,
         createdAt: e.createdAt.toISOString(),
+        pageAmount: e.pageAmount === null ? null : Number(e.pageAmount),
+        pageMappingVersion: e.pageMappingVersion,
       })),
       today: assignmentView(
         s.enrollment.assignments.find(
@@ -185,12 +187,15 @@ export async function mutateDay(
           throw new HttpError(409, "طلب مكرر غير صحيح");
         return;
       }
+      const pages = pageAmount(m.range)!;
       await tx.recitationEntry.create({
         data: {
           dailyStatusId: status.id,
           kind: m.kind,
           ...m.range,
           requestKey: m.requestKey,
+          pageAmount: pages.amount,
+          pageMappingVersion: pages.version,
         },
       });
     }

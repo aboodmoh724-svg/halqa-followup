@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  madaniPageMap,
+  roundPages,
+  formatPages,
+  type PageEntry,
+} from "./madani";
 // Tanzil/Quran chapter metadata: canonical Hafs verse counts; no page estimates.
 const names =
   "الفاتحة,البقرة,آل عمران,النساء,المائدة,الأنعام,الأعراف,الأنفال,التوبة,يونس,هود,يوسف,الرعد,إبراهيم,الحجر,النحل,الإسراء,الكهف,مريم,طه,الأنبياء,الحج,المؤمنون,النور,الفرقان,الشعراء,النمل,القصص,العنكبوت,الروم,لقمان,السجدة,الأحزاب,سبأ,فاطر,يس,الصافات,ص,الزمر,غافر,فصلت,الشورى,الزخرف,الدخان,الجاثية,الأحقاف,محمد,الفتح,الحجرات,ق,الذاريات,الطور,النجم,القمر,الرحمن,الواقعة,الحديد,المجادلة,الحشر,الممتحنة,الصف,الجمعة,المنافقون,التغابن,الطلاق,التحريم,الملك,القلم,الحاقة,المعارج,نوح,الجن,المزمل,المدثر,القيامة,الإنسان,المرسلات,النبأ,النازعات,عبس,التكوير,الانفطار,المطففين,الانشقاق,البروج,الطارق,الأعلى,الغاشية,الفجر,البلد,الشمس,الليل,الضحى,الشرح,التين,العلق,القدر,البينة,الزلزلة,العاديات,القارعة,التكاثر,العصر,الهمزة,الفيل,قريش,الماعون,الكوثر,الكافرون,النصر,المسد,الإخلاص,الفلق,الناس".split(
@@ -64,8 +70,7 @@ export function ayahAmount(r: QuranRange) {
     r.endAyah
   );
 }
-// A future verified per-ayah fractional Madani-page map plugs in here.
-// Never substitute a touched-page count or a uniform ayah/page estimate.
+// Offline layout-derived fractional map; method and provenance in docs/madani-pages.md.
 export interface MadaniPageMap {
   version: string;
   edition: "madani-604";
@@ -73,10 +78,9 @@ export interface MadaniPageMap {
 }
 export function pageAmount(
   r: QuranRange,
-  map?: MadaniPageMap,
+  map: MadaniPageMap = madaniPageMap,
 ): { amount: number; version: string } | null {
   rangeSchema.parse(r);
-  if (!map) return null;
   let amount = 0;
   for (let s = r.startSurah; s <= r.endSurah; s++)
     for (
@@ -89,5 +93,22 @@ export function pageAmount(
         throw new Error("Incomplete Madani page map");
       amount += fraction;
     }
-  return { amount, version: map.version };
+  return { amount: roundPages(amount), version: map.version };
 }
+
+// Existing foundation rows are computed on read, without modifying closed days.
+// Persisted amounts retain their original version; never reinterpret them silently.
+export function entryPages(entry: PageEntry) {
+  if (entry.pageAmount != null && entry.pageMappingVersion)
+    return entry.pageAmount;
+  if (entry.pageAmount != null || entry.pageMappingVersion)
+    throw new Error("Incomplete persisted page calculation");
+  return pageAmount(entry)!.amount;
+}
+export function totalPages(entries: PageEntry[]) {
+  return roundPages(entries.reduce((sum, entry) => sum + entryPages(entry), 0));
+}
+export function amountText(range: QuranRange | null | undefined) {
+  return range ? `${formatPages(pageAmount(range)!.amount)} صفحة` : "لم يحدد";
+}
+export { formatPages };

@@ -2,6 +2,7 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { dayDate, dayKey, nextDay } from "../src/lib/dates";
+import { pageAmount } from "../src/lib/quran";
 test(
   "PostgreSQL: repeat entries, assignment separation, absence, isolation, closure",
   { skip: !process.env.TEST_DATABASE_URL },
@@ -98,6 +99,10 @@ test(
       });
       let day = await getDay(teacher.id, halqa.id);
       assert.equal(day.students[0].entries.length, 2);
+      for (const saved of day.students[0].entries) {
+        assert.equal(saved.pageAmount, pageAmount(saved)!.amount);
+        assert.equal(saved.pageMappingVersion, pageAmount(saved)!.version);
+      }
       assert.deepEqual(day.students[0].today?.memorization, range);
       await assert.rejects(() =>
         mutateDay(teacher.id, halqa.id, {

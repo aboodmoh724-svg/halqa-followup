@@ -2,6 +2,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ayahAmount,
+  entryPages,
+  totalPages,
+  formatPages,
+  amountText,
   rangeSchema,
   rangeText,
   surahs,
@@ -551,10 +555,9 @@ export default function TeacherFlow() {
   const index = day.students.findIndex((s) => s.enrollmentId === selected);
   const completed = day.students.filter((s) => s.outcome).length;
   const total = (kind: "MEMORIZATION" | "REVIEW") =>
-    day.students
-      .flatMap((s) => s.entries)
-      .filter((e) => e.kind === kind)
-      .reduce((a, e) => a + ayahAmount(e), 0);
+    totalPages(
+      day.students.flatMap((s) => s.entries).filter((e) => e.kind === kind),
+    );
   const dateText = new Intl.DateTimeFormat("ar", {
     year: "numeric",
     month: "long",
@@ -594,8 +597,14 @@ export default function TeacherFlow() {
           )}
           <div className="assignment-today">
             <h3>واجب اليوم</h3>
-            <p>الحفظ: {rangeText(student.today?.memorization)}</p>
-            <p>المراجعة: {rangeText(student.today?.review)}</p>
+            <p>
+              الحفظ: {rangeText(student.today?.memorization)} ·{" "}
+              {amountText(student.today?.memorization)}
+            </p>
+            <p>
+              المراجعة: {rangeText(student.today?.review)} ·{" "}
+              {amountText(student.today?.review)}
+            </p>
             {student.today?.note && (
               <p className="subtle">{student.today.note}</p>
             )}
@@ -665,7 +674,7 @@ export default function TeacherFlow() {
                       minute: "2-digit",
                       timeZone: day.timezone,
                     }).format(new Date(e.createdAt))}{" "}
-                    · {ayahAmount(e)} آية
+                    · {formatPages(entryPages(e))} صفحة · {ayahAmount(e)} آية
                   </p>
                 </article>
               ))}
@@ -713,8 +722,14 @@ export default function TeacherFlow() {
           {student.tomorrow && (
             <section className="card small-space">
               <h3>واجب الغد</h3>
-              <p>الحفظ: {rangeText(student.tomorrow.memorization)}</p>
-              <p>المراجعة: {rangeText(student.tomorrow.review)}</p>
+              <p>
+                الحفظ: {rangeText(student.tomorrow.memorization)} ·{" "}
+                {amountText(student.tomorrow.memorization)}
+              </p>
+              <p>
+                المراجعة: {rangeText(student.tomorrow.review)} ·{" "}
+                {amountText(student.tomorrow.review)}
+              </p>
               {student.tomorrow.note && (
                 <p className="subtle">{student.tomorrow.note}</p>
               )}
@@ -777,11 +792,11 @@ export default function TeacherFlow() {
           <div className="card totals space">
             <div>
               <p className="subtle">إجمالي الحفظ</p>
-              <strong>{total("MEMORIZATION")} آية</strong>
+              <strong>{formatPages(total("MEMORIZATION"))} صفحة</strong>
             </div>
             <div>
               <p className="subtle">إجمالي المراجعة</p>
-              <strong>{total("REVIEW")} آية</strong>
+              <strong>{formatPages(total("REVIEW"))} صفحة</strong>
             </div>
           </div>
           <p className="subtle small-space">
