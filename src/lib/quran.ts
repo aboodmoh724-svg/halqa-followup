@@ -25,10 +25,24 @@ export const surahs = names.map((name, i) => ({
 }));
 export const rangeSchema = z
   .object({
-    startSurah: z.number().int().min(1).max(114),
-    startAyah: z.number().int().min(1),
-    endSurah: z.number().int().min(1).max(114),
-    endAyah: z.number().int().min(1),
+    startSurah: z
+      .number()
+      .int("اختر سورة صحيحة")
+      .min(1, "اختر سورة صحيحة")
+      .max(114, "اختر سورة صحيحة"),
+    startAyah: z
+      .number()
+      .int("رقم آية البداية يجب أن يكون عددًا صحيحًا")
+      .min(1, "آية البداية تبدأ من 1"),
+    endSurah: z
+      .number()
+      .int("اختر سورة صحيحة")
+      .min(1, "اختر سورة صحيحة")
+      .max(114, "اختر سورة صحيحة"),
+    endAyah: z
+      .number()
+      .int("رقم آية النهاية يجب أن يكون عددًا صحيحًا")
+      .min(1, "آية النهاية تبدأ من 1"),
   })
   .superRefine((r, ctx) => {
     if (r.startAyah > counts[r.startSurah - 1])
@@ -112,3 +126,6 @@ export function amountText(range: QuranRange | null | undefined) {
   return range ? `${formatPages(pageAmount(range)!.amount)} صفحة` : "لم يحدد";
 }
 export { formatPages };
+export function rangeDescription(range: QuranRange | null | undefined) {
+  return range ? `${rangeText(range)} · ${amountText(range)}` : "لم يحدد";
+}

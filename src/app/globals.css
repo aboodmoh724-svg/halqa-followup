@@ -269,11 +269,11 @@ input[type="checkbox"] {
 }
 .badge.MEMORIZED {
   background: #eaf6ef;
-  color: #2f8a63;
+  color: #19786e;
 }
 .badge.NOT_MEMORIZED {
   background: var(--red);
-  color: #c24e4e;
+  color: #a03f3f;
 }
 .badge.ABSENT {
   background: #f2f3f4;
@@ -291,7 +291,7 @@ input[type="checkbox"] {
   margin-bottom: 24px;
 }
 .assignment-today h3 {
-  color: #b7791f;
+  color: #94621b;
   font-size: 15px;
   margin-bottom: 6px;
 }
@@ -324,13 +324,13 @@ input[type="checkbox"] {
 }
 .action.assignment {
   background: var(--gold);
-  color: #b7791f;
+  color: #94621b;
 }
 .absent {
   margin-top: 12px;
   border: 1px solid #f0caca;
   background: var(--red);
-  color: #c24e4e;
+  color: #a03f3f;
   border-radius: 14px;
   width: 100%;
   min-height: 46px;
@@ -456,6 +456,14 @@ dialog::backdrop {
 .range-grid input {
   direction: ltr;
   text-align: center;
+}
+.range-amount {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--blue);
+  font-size: 14px;
+  color: var(--ink);
 }
 .summary-grid {
   display: grid;
