@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Outcome {
+  MEMORIZED
+  NOT_MEMORIZED
+  ABSENT
+}
+enum RecitationKind {
+  MEMORIZATION
+  REVIEW
+}
+model Teacher {
+  id String @id @default(cuid())
+  name String
+  codeLookup String @unique
+  codeHash String
+  halqas Halqa[]
+  sessions TeacherSession[]
+}
+model TeacherSession {
+  id String @id
+  teacherId String
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model LoginBucket {
+  key String @id
+  attempts Int @default(0)
+  expiresAt DateTime
+}
+model Halqa {
+  id String @id @default(cuid())
+  name String
+  teacherId String
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  enrollments Enrollment[]
+  days DailySession[]
+  @@index([teacherId])
+}
+model Student {
+  id String @id @default(cuid())
+  name String
+  enrollments Enrollment[]
+}
+model Enrollment {
+  id String @id @default(cuid())
+  studentId String
+  halqaId String
+  student Student @relation(fields: [studentId], references: [id])
+  halqa Halqa @relation(fields: [halqaId], references: [id])
+  active Boolean @default(true)
+  position Int @default(0)
+  dailyStatuses DailyStudentStatus[]
+  assignments Assignment[]
+  @@unique([studentId, halqaId])
+  @@unique([id, halqaId])
+  @@index([halqaId, active])
+}
+model DailySession {
+  id String @id @default(cuid())
+  halqaId String
+  date DateTime @db.Date
+  halqa Halqa @relation(fields: [halqaId], references: [id])
+  closedAt DateTime?
+  statuses DailyStudentStatus[]
+  @@unique([halqaId, date])
+  @@unique([id, halqaId])
+}
+model DailyStudentStatus {
+  id String @id @default(cuid())
+  sessionId String
+  enrollmentId String
+  halqaId String
+  session DailySession @relation(fields: [sessionId, halqaId], references: [id, halqaId])
+  enrollment Enrollment @relation(fields: [enrollmentId, halqaId], references: [id, halqaId])
+  outcome Outcome?
+  note String @default("")
+  updatedAt DateTime @updatedAt
+  entries RecitationEntry[]
+  @@unique([sessionId, enrollmentId])
+  @@index([enrollmentId, halqaId])
+}
+model RecitationEntry {
+  id String @id @default(cuid())
+  dailyStatusId String
+  dailyStatus DailyStudentStatus @relation(fields: [dailyStatusId], references: [id])
+  kind RecitationKind
+  startSurah Int
+  startAyah Int
+  endSurah Int
+  endAyah Int
+  createdAt DateTime @default(now())
+  // Set only once a validated Madani 604-page mapping is supplied.
+  pageAmount Decimal? @db.Decimal(8, 4)
+  pageMappingVersion String?
+  requestKey String @unique
+  @@index([dailyStatusId, createdAt])
+}
+model Assignment {
+  id String @id @default(cuid())
+  enrollmentId String
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+  dueDate DateTime @db.Date
+  memorization Json?
+  review Json?
+  note String @default("")
+  imageName String @default("")
+  carriedFromId String?
+  carriedFrom Assignment? @relation("Carry", fields: [carriedFromId], references: [id])
+  carriedTo Assignment[] @relation("Carry")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([enrollmentId, dueDate])
+}
