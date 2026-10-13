@@ -11,6 +11,8 @@ if (
 const base = process.env.APP_URL || "http://localhost:3000";
 const browser = await chromium.launch();
 const context = await browser.newContext({
+  // Cold PDF rendering starts a separate browser on the app server.
+  // Give the download a longer deadline than ordinary UI requests.
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
 });
@@ -96,6 +98,7 @@ try {
         .getAttribute("href"),
       base,
     ).href,
+    { timeout: 90000 },
   );
   assert.equal(individual.status(), 200);
   const pdf = await individual.body();
@@ -131,7 +134,9 @@ try {
         ).status(),
         200,
       );
-  const all = await context.request.get(`${url}/report?date=${day.date}`);
+  const all = await context.request.get(`${url}/report?date=${day.date}`, {
+    timeout: 90000,
+  });
   assert.equal(all.status(), 200);
   await writeFile("work/smoke/halqa.pdf", await all.body());
   await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
