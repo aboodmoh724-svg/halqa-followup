@@ -1,0 +1,39 @@
+name: Verify MVP
+on:
+  pull_request:
+  push:
+    branches: [main, feat/mvp-foundation]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: halqa
+          POSTGRES_PASSWORD: halqa
+          POSTGRES_DB: halqa_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://halqa:halqa@localhost:5432/halqa_test
+      TEST_DATABASE_URL: postgresql://halqa:halqa@localhost:5432/halqa_test
+      AUTH_SECRET: ci-test-only-secret-at-least-32-characters
+      APP_URL: http://localhost:3000
+      APP_TIMEZONE: Europe/Istanbul
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run db:migrate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

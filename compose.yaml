@@ -1,0 +1,11 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: halqa
+      POSTGRES_PASSWORD: halqa
+      POSTGRES_DB: halqa
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["halqa-data:/var/lib/postgresql/data"]
+volumes:
+  halqa-data:
