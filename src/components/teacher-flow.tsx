@@ -1,4 +1,5 @@
 "use client";
+import { academyName } from "@/lib/branding";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ayahAmount,
@@ -457,7 +458,7 @@ export default function TeacherFlow() {
   if (loading && !teacher)
     return (
       <main className="shell login" aria-busy="true">
-        <h1>متابعة الحلقة</h1>
+        <h1>{academyName}</h1>
         <p className="muted">جارٍ فتح الحلقة…</p>
       </main>
     );
@@ -468,7 +469,7 @@ export default function TeacherFlow() {
           ۞
         </div>
         <div>
-          <h1>متابعة الحلقة</h1>
+          <h1>{academyName}</h1>
           <p className="muted small-space">
             حيّاك الله، أدخل رمزك لبدء متابعة طلابك.
           </p>
