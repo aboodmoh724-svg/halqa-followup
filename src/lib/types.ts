@@ -17,6 +17,8 @@ export type EntryView = QuranRange & {
   id: string;
   kind: "MEMORIZATION" | "REVIEW";
   createdAt: string;
+  pageAmount: number | null;
+  pageMappingVersion: string | null;
 };
 export type StudentView = {
   enrollmentId: string;

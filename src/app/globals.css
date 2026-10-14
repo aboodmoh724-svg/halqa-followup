@@ -156,6 +156,84 @@ h3 {
   place-items: center;
   font-size: 30px;
 }
+.login-welcome {
+  position: relative;
+  isolation: isolate;
+  gap: 28px;
+  padding-top: 48px;
+  padding-bottom: 32px;
+}
+.login-welcome::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 90% 12%, #dfeee8 0, transparent 50%),
+    radial-gradient(ellipse at 0% 85%, #f3e9d4 0, transparent 42%);
+  pointer-events: none;
+}
+.login-intro {
+  text-align: center;
+}
+.login-intro .mark {
+  margin: 0 auto 20px;
+  width: 72px;
+  height: 72px;
+  font-size: 42px;
+  border: 1px solid #c9ddd6;
+  box-shadow: 0 8px 24px #19786e0d;
+  transform: rotate(8deg);
+}
+.login-eyebrow {
+  color: #52736b;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+.login-panel {
+  background: #ffffffed;
+  border: 1px solid #e1e8e3;
+  border-top: 3px solid #bd9b58;
+  border-radius: 24px;
+  padding: 26px 22px 20px;
+  box-shadow: 0 16px 48px #17324d0a;
+}
+.login-panel h2 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+.login-help {
+  color: #667085;
+  font-size: 13px;
+  margin: 0 0 24px;
+}
+.login-panel .code {
+  background: #fafcfb;
+  min-height: 60px;
+  font-size: 24px;
+  text-align: center;
+  letter-spacing: 8px;
+}
+.login-panel .code::placeholder {
+  color: #acbcb5;
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+.login-panel .primary {
+  box-shadow: 0 6px 16px #19786e1a;
+}
+.login-panel .subtle {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 11px;
+}
+.login-footer {
+  text-align: center;
+  color: #6a7e75;
+  font-size: 12px;
+  margin: 0;
+}
 label {
   display: block;
   font-size: 14px;
@@ -269,11 +347,11 @@ input[type="checkbox"] {
 }
 .badge.MEMORIZED {
   background: #eaf6ef;
-  color: #2f8a63;
+  color: #19786e;
 }
 .badge.NOT_MEMORIZED {
   background: var(--red);
-  color: #c24e4e;
+  color: #a03f3f;
 }
 .badge.ABSENT {
   background: #f2f3f4;
@@ -291,7 +369,7 @@ input[type="checkbox"] {
   margin-bottom: 24px;
 }
 .assignment-today h3 {
-  color: #b7791f;
+  color: #94621b;
   font-size: 15px;
   margin-bottom: 6px;
 }
@@ -324,13 +402,13 @@ input[type="checkbox"] {
 }
 .action.assignment {
   background: var(--gold);
-  color: #b7791f;
+  color: #94621b;
 }
 .absent {
   margin-top: 12px;
   border: 1px solid #f0caca;
   background: var(--red);
-  color: #c24e4e;
+  color: #a03f3f;
   border-radius: 14px;
   width: 100%;
   min-height: 46px;
@@ -456,6 +534,14 @@ dialog::backdrop {
 .range-grid input {
   direction: ltr;
   text-align: center;
+}
+.range-amount {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--blue);
+  font-size: 14px;
+  color: var(--ink);
 }
 .summary-grid {
   display: grid;

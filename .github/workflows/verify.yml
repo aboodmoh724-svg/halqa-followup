@@ -25,6 +25,8 @@ jobs:
       AUTH_SECRET: ci-test-only-secret-at-least-32-characters
       APP_URL: http://localhost:3000
       APP_TIMEZONE: Europe/Istanbul
+      SEED_TEACHER_CODE: "729416" # Disposable CI database only.
+      ALLOW_SMOKE_MUTATIONS: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,3 +39,25 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run db:seed
+      - name: Start production server for mobile smoke test
+        run: |
+          mkdir -p work/smoke
+          npm run start > work/server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:3000/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat work/server.log
+          exit 1
+      - run: npm run test:browser
+      - name: Save mobile screenshots and sample PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-and-pdf-preview
+          path: |
+            work/smoke/
+            work/server.log
+          retention-days: 7

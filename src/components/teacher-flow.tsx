@@ -1,7 +1,13 @@
 "use client";
+import { academyName } from "@/lib/branding";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ayahAmount,
+  entryPages,
+  totalPages,
+  formatPages,
+  amountText,
+  rangeDescription,
   rangeSchema,
   rangeText,
   surahs,
@@ -15,6 +21,12 @@ import {
 } from "@/lib/types";
 type Teacher = { name: string; halqas: { id: string; name: string }[] };
 type Mode = "memory" | "review" | "assignment" | "absent" | "note";
+function studentSearchKey(text: string) {
+  return text
+    .normalize("NFKC")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/[ًٌٍَُِّْ\s]/g, "");
+}
 const initialRange: QuranRange = {
   startSurah: 1,
   startAyah: 1,
@@ -110,6 +122,11 @@ function RangeFields({
           </div>
         ))}
       </div>
+      {rangeSchema.safeParse(value).success && (
+        <p className="range-amount" aria-live="polite">
+          المقدار: {amountText(value)}
+        </p>
+      )}
     </fieldset>
   );
 }
@@ -150,7 +167,7 @@ function Sheet({
   const [note, setNote] = useState(
     mode === "assignment" ? (student.tomorrow?.note ?? "") : student.note,
   );
-  const [imageName, setImageName] = useState(student.tomorrow?.imageName ?? "");
+  const imageName = student.tomorrow?.imageName ?? "";
   const [carry, setCarry] = useState(true);
   const [error, setError] = useState("");
   const requestKey = useRef<string>("");
@@ -219,7 +236,7 @@ function Sheet({
         else onClose();
       }}
     >
-      <form className="sheet stack" onSubmit={submit}>
+      <form className="sheet stack" onSubmit={submit} noValidate>
         <div className="sheet-header">
           <h2 id="sheet-title">{titles[mode]}</h2>
           <button
@@ -277,15 +294,6 @@ function Sheet({
                 onChange={setReview}
               />
             )}
-            <label>
-              اسم الصورة (نص فقط)
-              <input
-                maxLength={100}
-                value={imageName}
-                onChange={(e) => setImageName(e.target.value)}
-                placeholder="مثل: 17"
-              />
-            </label>
           </>
         )}
         {mode === "absent" && (
@@ -340,6 +348,10 @@ export default function TeacherFlow() {
   const [loginError, setLoginError] = useState("");
   const [code, setCode] = useState("");
   const [remember, setRemember] = useState(true);
+  const [studentSearch, setStudentSearch] = useState("");
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [view, selected]);
   const [message, setMessage] = useState<{
     text: string;
     error: boolean;
@@ -357,6 +369,7 @@ export default function TeacherFlow() {
       setDay(data);
       setView("list");
       setSelected(null);
+      setStudentSearch("");
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
@@ -453,63 +466,70 @@ export default function TeacherFlow() {
   if (loading && !teacher)
     return (
       <main className="shell login" aria-busy="true">
-        <h1>متابعة الحلقة</h1>
+        <h1>{academyName}</h1>
         <p className="muted">جارٍ فتح الحلقة…</p>
       </main>
     );
   if (!teacher)
     return (
-      <main className="shell login">
-        <div className="mark" aria-hidden="true">
-          ۞
+      <main className="shell login login-welcome">
+        <div className="login-intro">
+          <div className="mark" aria-hidden="true">
+            ۞
+          </div>
+          <div>
+            <p className="login-eyebrow">متابعة حلقات القرآن الكريم</p>
+            <h1>{academyName}</h1>
+            <p className="muted small-space">كل يوم، خطوة جديدة مع طلابك.</p>
+          </div>
         </div>
-        <div>
-          <h1>متابعة الحلقة</h1>
-          <p className="muted small-space">
-            حيّاك الله، أدخل رمزك لبدء متابعة طلابك.
-          </p>
-        </div>
-        <form className="stack" onSubmit={login}>
-          <label htmlFor="code">رمز المعلم</label>
-          <input
-            id="code"
-            className="code"
-            autoComplete="off"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            minLength={6}
-            maxLength={6}
-            required
-            dir="ltr"
-            value={code}
-            onChange={(e) =>
-              setCode(
-                e.target.value
-                  .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
-                  .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
-                  .replace(/\D/g, ""),
-              )
-            }
-          />
-          <label className="check">
+        <div className="login-panel">
+          <h2>أهلًا بك، معلمنا</h2>
+          <p className="login-help">أدخل رمزك الخاص لفتح حلقتك.</p>
+          <form className="stack" onSubmit={login}>
+            <label htmlFor="code">رمز المعلم</label>
             <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
+              id="code"
+              className="code"
+              autoComplete="off"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              minLength={6}
+              maxLength={6}
+              required
+              dir="ltr"
+              placeholder="— — — — — —"
+              value={code}
+              onChange={(e) =>
+                setCode(
+                  e.target.value
+                    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
+                    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
+                    .replace(/\D/g, ""),
+                )
+              }
             />
-            تذكرني على هذا الجهاز
-          </label>
-          {loginError && (
-            <p className="notice error" role="alert">
-              {loginError}
-            </p>
-          )}
-          <button className="primary" disabled={busy}>
-            {busy ? "جارٍ الدخول…" : "الدخول إلى الحلقة"}
-          </button>
-        </form>
-        <p className="subtle">رمزك خاص بك. لا تشاركه مع الآخرين.</p>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              تذكرني على هذا الجهاز
+            </label>
+            {loginError && (
+              <p className="notice error" role="alert">
+                {loginError}
+              </p>
+            )}
+            <button className="primary" disabled={busy}>
+              {busy ? "جارٍ الدخول…" : "الدخول إلى الحلقة"}
+            </button>
+          </form>
+          <p className="subtle">رمزك خاص بك. لا تشاركه مع الآخرين.</p>
+        </div>
+        <p className="login-footer">حفظٌ متقن · متابعةٌ أيسر</p>
       </main>
     );
   if (!day)
@@ -550,11 +570,15 @@ export default function TeacherFlow() {
   const student = day.students.find((s) => s.enrollmentId === selected);
   const index = day.students.findIndex((s) => s.enrollmentId === selected);
   const completed = day.students.filter((s) => s.outcome).length;
+  const visibleStudents = day.students
+    .map((student, index) => ({ student, index }))
+    .filter(({ student }) =>
+      studentSearchKey(student.name).includes(studentSearchKey(studentSearch)),
+    );
   const total = (kind: "MEMORIZATION" | "REVIEW") =>
-    day.students
-      .flatMap((s) => s.entries)
-      .filter((e) => e.kind === kind)
-      .reduce((a, e) => a + ayahAmount(e), 0);
+    totalPages(
+      day.students.flatMap((s) => s.entries).filter((e) => e.kind === kind),
+    );
   const dateText = new Intl.DateTimeFormat("ar", {
     year: "numeric",
     month: "long",
@@ -594,13 +618,10 @@ export default function TeacherFlow() {
           )}
           <div className="assignment-today">
             <h3>واجب اليوم</h3>
-            <p>الحفظ: {rangeText(student.today?.memorization)}</p>
-            <p>المراجعة: {rangeText(student.today?.review)}</p>
+            <p>الحفظ: {rangeDescription(student.today?.memorization)}</p>
+            <p>المراجعة: {rangeDescription(student.today?.review)}</p>
             {student.today?.note && (
               <p className="subtle">{student.today.note}</p>
-            )}
-            {student.today?.imageName && (
-              <p className="subtle">الصورة: {student.today.imageName}</p>
             )}
           </div>
           <h2>تسجيل اليوم</h2>
@@ -665,7 +686,7 @@ export default function TeacherFlow() {
                       minute: "2-digit",
                       timeZone: day.timezone,
                     }).format(new Date(e.createdAt))}{" "}
-                    · {ayahAmount(e)} آية
+                    · {formatPages(entryPages(e))} صفحة · {ayahAmount(e)} آية
                   </p>
                 </article>
               ))}
@@ -713,13 +734,10 @@ export default function TeacherFlow() {
           {student.tomorrow && (
             <section className="card small-space">
               <h3>واجب الغد</h3>
-              <p>الحفظ: {rangeText(student.tomorrow.memorization)}</p>
-              <p>المراجعة: {rangeText(student.tomorrow.review)}</p>
+              <p>الحفظ: {rangeDescription(student.tomorrow.memorization)}</p>
+              <p>المراجعة: {rangeDescription(student.tomorrow.review)}</p>
               {student.tomorrow.note && (
                 <p className="subtle">{student.tomorrow.note}</p>
-              )}
-              {student.tomorrow.imageName && (
-                <p className="subtle">الصورة: {student.tomorrow.imageName}</p>
               )}
             </section>
           )}
@@ -736,9 +754,15 @@ export default function TeacherFlow() {
               ? "الطالب التالي"
               : "العودة إلى الطلاب"}
           </button>
-          <a className="report-link" href={report(student.enrollmentId)}>
-            تنزيل تقرير الطالب PDF
-          </a>
+          {student.outcome ? (
+            <a className="report-link" href={report(student.enrollmentId)}>
+              تنزيل تقرير الطالب PDF
+            </a>
+          ) : (
+            <p className="subtle report-link">
+              حدد النتيجة اليومية لتفعيل تقرير الطالب.
+            </p>
+          )}
           {mode && (
             <Sheet
               key={`${student.enrollmentId}-${mode}`}
@@ -777,15 +801,15 @@ export default function TeacherFlow() {
           <div className="card totals space">
             <div>
               <p className="subtle">إجمالي الحفظ</p>
-              <strong>{total("MEMORIZATION")} آية</strong>
+              <strong>{formatPages(total("MEMORIZATION"))} صفحة</strong>
             </div>
             <div>
               <p className="subtle">إجمالي المراجعة</p>
-              <strong>{total("REVIEW")} آية</strong>
+              <strong>{formatPages(total("REVIEW"))} صفحة</strong>
             </div>
           </div>
           <p className="subtle small-space">
-            تُحسب الصفحات لاحقًا وفق خريطة المصحف المدني 604 صفحة.
+            المقادير تقدير وفق المصحف المدني 604 صفحة، وتُحسب لكل تسميع مسجل.
           </p>
           {completed < day.students.length && (
             <div className="notice space">
@@ -820,9 +844,15 @@ export default function TeacherFlow() {
               {busy ? "جارٍ الحفظ…" : "إنهاء يوم الحلقة"}
             </button>
           )}
-          <a className="secondary space" href={report()}>
-            تنزيل PDF الحلقة كاملًا
-          </a>
+          {completed === day.students.length && completed > 0 ? (
+            <a className="secondary space" href={report()}>
+              تنزيل PDF الحلقة كاملًا
+            </a>
+          ) : (
+            <p className="subtle space">
+              يُتاح تقرير الحلقة بعد تحديد نتيجة كل طالب.
+            </p>
+          )}
         </>
       ) : (
         <>
@@ -854,8 +884,19 @@ export default function TeacherFlow() {
               {day.closedAt ? "تم إنهاء اليوم" : "اختر الطالب وسجّل تسميعه"}
             </p>
           </div>
+          <div className="space">
+            <label htmlFor="student-search">البحث عن طالب</label>
+            <input
+              id="student-search"
+              type="search"
+              placeholder="اكتب اسم الطالب"
+              value={studentSearch}
+              onChange={(event) => setStudentSearch(event.target.value)}
+              maxLength={100}
+            />
+          </div>
           <div className="stack space">
-            {day.students.map((s, i) => (
+            {visibleStudents.map(({ student: s, index: i }) => (
               <button
                 className="student-row"
                 key={s.enrollmentId}
@@ -875,6 +916,11 @@ export default function TeacherFlow() {
               </button>
             ))}
           </div>
+          {visibleStudents.length === 0 && (
+            <p className="notice space">
+              لا يوجد طالب بهذا الاسم. جرّب جزءًا آخر من الاسم.
+            </p>
+          )}
           <div className="home-footer">
             <button className="primary" onClick={() => setView("summary")}>
               ملخص ونهاية الحلقة
