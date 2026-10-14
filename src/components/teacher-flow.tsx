@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Download,
 } from "lucide-react";
+import { dailyWindow } from "@/lib/dates";
 import { academyName } from "@/lib/branding";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
@@ -480,6 +481,33 @@ export default function TeacherFlow() {
       setLoading(false);
     }
   }
+  useEffect(() => {
+    if (!day) return;
+    const refresh = async () => {
+      if (busy) return;
+      const current = dailyWindow(new Date(), day.timezone);
+      if (current.date === day.date && current.writable === !day.readOnlyReason)
+        return;
+      try {
+        const fresh = await api<DayView>(`/api/halqas/${day.halqaId}`);
+        setDay(fresh);
+        setMode(null);
+        if (fresh.date !== day.date) {
+          setView("list");
+          setSelected(null);
+          setStudentSearch("");
+        }
+      } catch {
+        /* The server also enforces the cutoff. */
+      }
+    };
+    const timer = setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [day, busy]);
   async function bootstrap() {
     try {
       const r = await fetch("/api/halqas", { cache: "no-store" });
@@ -679,6 +707,7 @@ export default function TeacherFlow() {
         )}
       </main>
     );
+  const locked = !!day.closedAt || !!day.readOnlyReason;
   const student = day.students.find((s) => s.enrollmentId === selected);
   const index = day.students.findIndex((s) => s.enrollmentId === selected);
   const completed = day.students.filter(
@@ -725,9 +754,9 @@ export default function TeacherFlow() {
               الطلاب ←
             </button>
           </div>
-          {day.closedAt && (
+          {locked && (
             <p className="notice closed small-space">
-              تم إنهاء الحلقة لهذا اليوم
+              {day.readOnlyReason || "تم إنهاء الحلقة لهذا اليوم"}
             </p>
           )}
           <div className="assignment-today">
@@ -759,7 +788,7 @@ export default function TeacherFlow() {
             !student.tomorrow && (
               <button
                 className="secondary"
-                disabled={busy || !!day.closedAt}
+                disabled={busy || locked}
                 onClick={() =>
                   save({
                     action: "status",
@@ -777,7 +806,7 @@ export default function TeacherFlow() {
             <button
               className="action memory"
               hidden={student.outcome === "ABSENT"}
-              disabled={busy || !!day.closedAt || student.outcome === "ABSENT"}
+              disabled={busy || locked || student.outcome === "ABSENT"}
               onClick={() => setMode("memory")}
             >
               <BookOpen size={21} aria-hidden="true" /> + حفظ جديد
@@ -785,14 +814,14 @@ export default function TeacherFlow() {
             <button
               className="action"
               hidden={student.outcome === "ABSENT"}
-              disabled={busy || !!day.closedAt || student.outcome === "ABSENT"}
+              disabled={busy || locked || student.outcome === "ABSENT"}
               onClick={() => setMode("review")}
             >
               <RotateCcw size={21} aria-hidden="true" /> + مراجعة
             </button>
             <button
               className="action assignment"
-              disabled={busy || !!day.closedAt}
+              disabled={busy || locked}
               onClick={() => setMode("assignment")}
             >
               <CalendarDays size={21} aria-hidden="true" /> + واجب الغد
@@ -800,7 +829,7 @@ export default function TeacherFlow() {
           </div>
           <button
             className="absent"
-            disabled={busy || !!day.closedAt}
+            disabled={busy || locked}
             onClick={() =>
               student.outcome === "ABSENT"
                 ? save({
@@ -868,7 +897,7 @@ export default function TeacherFlow() {
                     <button
                       key={kind}
                       className={`assessment-tile ${value || "pending"}`}
-                      disabled={busy || !!day.closedAt}
+                      disabled={busy || locked}
                       onClick={() =>
                         setMode(
                           value || student.entries.some((e) => e.kind === kind)
@@ -910,7 +939,7 @@ export default function TeacherFlow() {
           )}
           <button
             className="text-button small-space"
-            disabled={busy || !!day.closedAt}
+            disabled={busy || locked}
             onClick={() => setMode("note")}
           >
             {student.note ? "تعديل ملاحظة اليوم" : "إضافة ملاحظة اليوم"}
@@ -949,7 +978,7 @@ export default function TeacherFlow() {
               الطالب.
             </p>
           )}
-          {mode && (
+          {mode && !locked && (
             <Sheet
               key={`${student.enrollmentId}-${mode}`}
               mode={mode}
@@ -1061,8 +1090,10 @@ export default function TeacherFlow() {
                 ))}
             </div>
           )}
-          {day.closedAt ? (
-            <p className="notice closed space">تم إنهاء اليوم وحفظ النتائج</p>
+          {locked ? (
+            <p className="notice closed space">
+              {day.readOnlyReason || "تم إنهاء اليوم وحفظ النتائج"}
+            </p>
           ) : (
             <button
               className="primary space"
@@ -1083,6 +1114,9 @@ export default function TeacherFlow() {
             <div>
               <h1>{day.halqaName}</h1>
               <p className="subtle">{dateText}</p>
+              <p className="subtle">
+                وقت الإدخال: 6 صباحًا – 12 ليلًا · بتوقيت تركيا
+              </p>
             </div>
             <button className="text-button" disabled={busy} onClick={logout}>
               خروج
@@ -1104,7 +1138,8 @@ export default function TeacherFlow() {
               />
             </div>
             <p className="subtle small-space">
-              {day.closedAt ? "تم إنهاء اليوم" : "اختر الطالب وسجّل تسميعه"}
+              {day.readOnlyReason ||
+                (day.closedAt ? "تم إنهاء اليوم" : "اختر الطالب وسجّل تسميعه")}
             </p>
           </div>
           <button
@@ -1122,6 +1157,10 @@ export default function TeacherFlow() {
           </button>
           <details className="card teacher-guide small-space">
             <summary>دليل المعلم · طريقة المتابعة اليومية</summary>
+            <p className="subtle">
+              كل يوم من 6 صباحًا حتى منتصف الليل. يبدأ تقرير جديد دون حذف
+              التقارير السابقة، ويظهر واجب الغد في واجب اليوم.
+            </p>
             <ol>
               <li>
                 اختر الطالب، وسجّل مدى الحفظ والمراجعة ونتيجة كل منهما: حافظ أو

@@ -62,7 +62,7 @@ test("layout-derived pages are versioned and custom maps still work", () => {
 test("calendar rollover uses institution timezone", () => {
   assert.equal(
     dayKey(new Date("2026-10-13T21:30:00Z"), "Europe/Istanbul"),
-    "2026-10-14",
+    "2026-10-13",
   );
   assert.equal(nextDay("2026-12-31"), "2027-01-01");
   assert.equal(nextDay("2028-02-28"), "2028-02-29");

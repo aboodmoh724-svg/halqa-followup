@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { HttpError } from "./auth";
-import { dayDate, dayKey, nextDay } from "./dates";
+import { dayDate, dayKey, nextDay, dayReadOnlyReason } from "./dates";
 import {
   mutationSchema,
   independentSummary,
@@ -118,6 +118,7 @@ export async function getDay(
     date,
     timezone: process.env.APP_TIMEZONE || "Europe/Istanbul",
     closedAt: session.closedAt?.toISOString() ?? null,
+    readOnlyReason: dayReadOnlyReason(date),
     students: session.statuses.map((s) => ({
       enrollmentId: s.enrollmentId,
       name: s.enrollment.student.name,
@@ -154,16 +155,21 @@ export async function mutateDay(
   teacherId: string,
   halqaId: string,
   input: unknown,
+  now?: Date,
 ) {
   const m = mutationSchema.parse(input);
-  if (m.date !== dayKey())
+  if (m.date !== dayKey(now))
     throw new HttpError(409, "تغير اليوم. حدّث الصفحة قبل التسجيل");
-  const session = await ensureDay(teacherId, halqaId);
+  const reason = dayReadOnlyReason(m.date, now);
+  if (reason) throw new HttpError(409, reason);
+  const session = await ensureDay(teacherId, halqaId, m.date);
   await serial(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "DailySession" WHERE id = ${session.id} FOR UPDATE`;
     const current = await tx.dailySession.findUniqueOrThrow({
       where: { id: session.id },
     });
+    const cutoff = dayReadOnlyReason(m.date, now);
+    if (cutoff) throw new HttpError(409, cutoff);
     if (current.closedAt) throw new HttpError(409, "تم إنهاء يوم الحلقة");
     if (m.action === "close") {
       const students = await tx.dailyStudentStatus.findMany({

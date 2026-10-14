@@ -56,6 +56,7 @@ export type DayView = {
   date: string;
   timezone: string;
   closedAt: string | null;
+  readOnlyReason?: string | null;
   students: StudentView[];
 };
 export const mutationSchema = z.discriminatedUnion("action", [

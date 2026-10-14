@@ -9,8 +9,14 @@ test(
   async () => {
     process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
     const { db } = await import("../src/lib/db");
-    const { ensureDay, getDay, mutateDay } =
-      await import("../src/lib/day-service");
+    const {
+      ensureDay,
+      getDay,
+      mutateDay: mutateAtRealTime,
+    } = await import("../src/lib/day-service");
+    const noon = new Date(`${dayKey()}T09:00:00Z`);
+    const mutateDay = (teacherId: string, halqaId: string, input: unknown) =>
+      mutateAtRealTime(teacherId, halqaId, input, noon);
     const key = randomUUID();
     const teacher = await db.teacher.create({
       data: { name: "test", codeLookup: key, codeHash: "test" },
@@ -27,6 +33,16 @@ test(
     const enrollment = await db.enrollment.create({
       data: { studentId: student.id, halqaId: halqa.id },
     });
+    await assert.rejects(
+      () =>
+        mutateAtRealTime(
+          teacher.id,
+          halqa.id,
+          { action: "close", date: dayKey(new Date("2026-10-15T00:00:00Z")) },
+          new Date("2026-10-15T00:00:00Z"),
+        ),
+      /انتهى وقت الإدخال/,
+    );
     const range = { startSurah: 67, startAyah: 10, endSurah: 67, endAyah: 20 };
     const today = dayKey();
     try {
