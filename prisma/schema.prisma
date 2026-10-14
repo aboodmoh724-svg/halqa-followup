@@ -80,17 +80,25 @@ model DailyStudentStatus {
   session DailySession @relation(fields: [sessionId, halqaId], references: [id, halqaId])
   enrollment Enrollment @relation(fields: [enrollmentId, halqaId], references: [id, halqaId])
   outcome Outcome?
+  memorizationResult String?
+  reviewResult String?
   note String @default("")
   updatedAt DateTime @updatedAt
   entries RecitationEntry[]
   @@unique([sessionId, enrollmentId])
   @@index([enrollmentId, halqaId])
 }
+enum RangeDirection {
+  FORWARD
+  REVERSE
+}
 model RecitationEntry {
+  direction RangeDirection @default(FORWARD)
   id String @id @default(cuid())
   dailyStatusId String
   dailyStatus DailyStudentStatus @relation(fields: [dailyStatusId], references: [id])
   kind RecitationKind
+  assessment String?
   startSurah Int
   startAyah Int
   endSurah Int
@@ -103,6 +111,8 @@ model RecitationEntry {
   @@index([dailyStatusId, createdAt])
 }
 model Assignment {
+  autoMemorizationStatusId String?
+  memorizationManual Boolean @default(false)
   id String @id @default(cuid())
   enrollmentId String
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id])

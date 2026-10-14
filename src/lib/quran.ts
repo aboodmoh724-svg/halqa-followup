@@ -25,6 +25,7 @@ export const surahs = names.map((name, i) => ({
 }));
 export const rangeSchema = z
   .object({
+    direction: z.enum(["FORWARD", "REVERSE"]).optional(),
     startSurah: z
       .number()
       .int("اختر سورة صحيحة")
@@ -57,31 +58,43 @@ export const rangeSchema = z
         path: ["endAyah"],
         message: "آية النهاية غير صحيحة لهذه السورة",
       });
-    if (
-      r.endSurah < r.startSurah ||
-      (r.endSurah === r.startSurah && r.endAyah < r.startAyah)
-    )
+    if (r.endSurah === r.startSurah && r.endAyah < r.startAyah)
       ctx.addIssue({
         code: "custom",
-        message: "نهاية المدى يجب أن تأتي بعد بدايته",
+        message: "داخل السورة، آية النهاية يجب أن تأتي بعد آية البداية",
       });
+  })
+  .transform((r) => {
+    const normalized = { ...r };
+    if (r.startSurah > r.endSurah) normalized.direction = "REVERSE";
+    else delete normalized.direction;
+    return normalized;
   });
 export type QuranRange = z.infer<typeof rangeSchema>;
 export function rangeText(r: QuranRange | null | undefined) {
   if (!r) return "لم يحدد";
   return r.startSurah === r.endSurah
     ? `${names[r.startSurah - 1]} ${r.startAyah} – ${r.endAyah}`
-    : `${names[r.startSurah - 1]} ${r.startAyah} إلى ${names[r.endSurah - 1]} ${r.endAyah}`;
+    : `${names[r.startSurah - 1]} ${r.startAyah} إلى ${names[r.endSurah - 1]} ${r.endAyah}${r.startSurah > r.endSurah ? " · بعكس ترتيب السور" : ""}`;
+}
+export function rangeSegments(r: QuranRange) {
+  rangeSchema.parse(r);
+  const step = r.startSurah > r.endSurah ? -1 : 1;
+  const segments: { surah: number; startAyah: number; endAyah: number }[] = [];
+  for (let surah = r.startSurah; ; surah += step) {
+    segments.push({
+      surah,
+      startAyah: surah === r.startSurah ? r.startAyah : 1,
+      endAyah: surah === r.endSurah ? r.endAyah : counts[surah - 1],
+    });
+    if (surah === r.endSurah) break;
+  }
+  return segments;
 }
 export function ayahAmount(r: QuranRange) {
-  rangeSchema.parse(r);
-  if (r.startSurah === r.endSurah) return r.endAyah - r.startAyah + 1;
-  return (
-    counts[r.startSurah - 1] -
-    r.startAyah +
-    1 +
-    counts.slice(r.startSurah, r.endSurah - 1).reduce((a, b) => a + b, 0) +
-    r.endAyah
+  return rangeSegments(r).reduce(
+    (sum, s) => sum + s.endAyah - s.startAyah + 1,
+    0,
   );
 }
 // Offline layout-derived fractional map; method and provenance in docs/madani-pages.md.
@@ -94,15 +107,10 @@ export function pageAmount(
   r: QuranRange,
   map: MadaniPageMap = madaniPageMap,
 ): { amount: number; version: string } | null {
-  rangeSchema.parse(r);
   let amount = 0;
-  for (let s = r.startSurah; s <= r.endSurah; s++)
-    for (
-      let a = s === r.startSurah ? r.startAyah : 1;
-      a <= (s === r.endSurah ? r.endAyah : counts[s - 1]);
-      a++
-    ) {
-      const fraction = map.fraction(s, a);
+  for (const segment of rangeSegments(r))
+    for (let ayah = segment.startAyah; ayah <= segment.endAyah; ayah++) {
+      const fraction = map.fraction(segment.surah, ayah);
       if (!Number.isFinite(fraction) || fraction <= 0)
         throw new Error("Incomplete Madani page map");
       amount += fraction;

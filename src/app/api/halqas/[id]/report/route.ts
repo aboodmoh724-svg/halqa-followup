@@ -2,6 +2,7 @@ import { apiError, teacherId, HttpError } from "@/lib/auth";
 import { getDay } from "@/lib/day-service";
 import { dayKey } from "@/lib/dates";
 import { generateReport } from "@/lib/report";
+import { reportIssues } from "@/lib/types";
 import { db } from "@/lib/db";
 export const runtime = "nodejs";
 export async function GET(
@@ -24,6 +25,14 @@ export async function GET(
     const students = student
       ? day.students.filter((s) => s.enrollmentId === student)
       : day.students;
+    const pending = students.filter(
+      (s) => reportIssues(s, !!day.closedAt).length,
+    );
+    if (pending.length)
+      throw new HttpError(
+        409,
+        `بقي ${pending.length} تقارير غير مكتملة. أكمل النتائج ومدى التسميع وواجب الغد أولًا.`,
+      );
     const window = Math.floor(Date.now() / 60000);
     const key = `pdf:${teacher}:${window}`;
     const bucket = await db.loginBucket.upsert({
@@ -33,7 +42,7 @@ export async function GET(
     });
     if (bucket.attempts > 6)
       throw new HttpError(429, "انتظر دقيقة قبل توليد المزيد من التقارير");
-    const pdf = await generateReport(day, students);
+    const pdf = await generateReport(day, students, !student);
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",

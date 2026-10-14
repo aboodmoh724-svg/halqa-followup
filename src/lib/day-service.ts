@@ -1,8 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { HttpError } from "./auth";
-import { dayDate, dayKey, nextDay } from "./dates";
-import { mutationSchema, type DayView, type AssignmentView } from "./types";
+import { dayDate, dayKey, nextDay, dayReadOnlyReason } from "./dates";
+import {
+  mutationSchema,
+  independentSummary,
+  reportIssues,
+  type DayView,
+  type AssignmentView,
+} from "./types";
 import { rangeSchema, pageAmount } from "./quran";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -60,6 +66,8 @@ function assignmentView(
         review: Prisma.JsonValue;
         note: string;
         imageName: string;
+        autoMemorizationStatusId: string | null;
+        memorizationManual: boolean;
       }
     | undefined,
 ): AssignmentView | null {
@@ -70,6 +78,8 @@ function assignmentView(
         review: a.review ? rangeSchema.parse(a.review) : null,
         note: a.note,
         imageName: a.imageName,
+        autoMemorizationStatusId: a.autoMemorizationStatusId,
+        memorizationManual: a.memorizationManual,
       }
     : null;
 }
@@ -108,14 +118,19 @@ export async function getDay(
     date,
     timezone: process.env.APP_TIMEZONE || "Europe/Istanbul",
     closedAt: session.closedAt?.toISOString() ?? null,
+    readOnlyReason: dayReadOnlyReason(date),
     students: session.statuses.map((s) => ({
       enrollmentId: s.enrollmentId,
       name: s.enrollment.student.name,
       outcome: s.outcome,
+      memorizationResult: s.memorizationResult,
+      reviewResult: s.reviewResult,
       note: s.note,
       entries: s.entries.map((e) => ({
         id: e.id,
         kind: e.kind,
+        assessment: e.assessment,
+        ...(e.direction === "REVERSE" ? { direction: "REVERSE" as const } : {}),
         startSurah: e.startSurah,
         startAyah: e.startAyah,
         endSurah: e.endSurah,
@@ -141,23 +156,58 @@ export async function mutateDay(
   teacherId: string,
   halqaId: string,
   input: unknown,
+  now?: Date,
 ) {
   const m = mutationSchema.parse(input);
-  if (m.date !== dayKey())
+  if (m.date !== dayKey(now))
     throw new HttpError(409, "تغير اليوم. حدّث الصفحة قبل التسجيل");
-  const session = await ensureDay(teacherId, halqaId);
+  const reason = dayReadOnlyReason(m.date, now);
+  if (reason) throw new HttpError(409, reason);
+  const session = await ensureDay(teacherId, halqaId, m.date);
   await serial(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "DailySession" WHERE id = ${session.id} FOR UPDATE`;
     const current = await tx.dailySession.findUniqueOrThrow({
       where: { id: session.id },
     });
+    const cutoff = dayReadOnlyReason(m.date, now);
+    if (cutoff) throw new HttpError(409, cutoff);
     if (current.closedAt) throw new HttpError(409, "تم إنهاء يوم الحلقة");
     if (m.action === "close") {
-      const pending = await tx.dailyStudentStatus.count({
-        where: { sessionId: session.id, outcome: null },
+      const students = await tx.dailyStudentStatus.findMany({
+        where: { sessionId: session.id },
+        include: {
+          entries: true,
+          enrollment: {
+            include: {
+              student: true,
+              assignments: { where: { dueDate: dayDate(nextDay(m.date)) } },
+            },
+          },
+        },
       });
-      if (pending)
-        throw new HttpError(409, `بقي ${pending} طالب بدون نتيجة نهائية`);
+      const pending = students.filter(
+        (s) =>
+          reportIssues({
+            enrollmentId: s.enrollmentId,
+            name: s.enrollment.student.name,
+            outcome: s.outcome,
+            memorizationResult: s.memorizationResult,
+            reviewResult: s.reviewResult,
+            note: s.note,
+            entries: s.entries.map((e) => ({
+              ...e,
+              createdAt: e.createdAt.toISOString(),
+              pageAmount: e.pageAmount === null ? null : Number(e.pageAmount),
+            })),
+            today: null,
+            tomorrow: assignmentView(s.enrollment.assignments[0]),
+          }).length,
+      );
+      if (pending.length)
+        throw new HttpError(
+          409,
+          `بقي ${pending.length} تقرير غير مكتمل: أكمل نتيجتي الحفظ والمراجعة ومدى التسميع وواجب الغد`,
+        );
       await tx.dailySession.update({
         where: { id: session.id },
         data: { closedAt: new Date() },
@@ -166,9 +216,44 @@ export async function mutateDay(
     }
     const status = await tx.dailyStudentStatus.findFirst({
       where: { sessionId: session.id, enrollmentId: m.enrollmentId, halqaId },
-      include: { entries: true },
+      include: { entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
     });
     if (!status) throw new HttpError(404, "الطالب غير موجود في هذه الحلقة");
+    if (m.action === "edit-entry") {
+      if (status.outcome === "ABSENT")
+        throw new HttpError(409, "ألغِ الغياب أولًا قبل تعديل التسميع");
+      const entry = status.entries.find((e) => e.id === m.entryId);
+      if (!entry)
+        throw new HttpError(404, "التسميع غير موجود لهذا الطالب في هذا اليوم");
+      const pages = pageAmount(m.range)!;
+      await tx.recitationEntry.update({
+        where: { id: entry.id },
+        data: {
+          ...m.range,
+          direction: m.range.direction ?? "FORWARD",
+          pageAmount: pages.amount,
+          pageMappingVersion: pages.version,
+        },
+      });
+      const lastMemory = [...status.entries]
+        .reverse()
+        .find((e) => e.kind === "MEMORIZATION");
+      if (
+        entry.kind === "MEMORIZATION" &&
+        lastMemory?.id === entry.id &&
+        status.memorizationResult === "NOT_MASTERED"
+      ) {
+        await tx.assignment.updateMany({
+          where: {
+            enrollmentId: m.enrollmentId,
+            dueDate: dayDate(nextDay(m.date)),
+            autoMemorizationStatusId: status.id,
+            memorizationManual: false,
+          },
+          data: { memorization: m.range },
+        });
+      }
+    }
     if (m.action === "entry") {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل التسميع");
@@ -179,6 +264,8 @@ export async function mutateDay(
         if (
           existing.dailyStatusId !== status.id ||
           existing.kind !== m.kind ||
+          existing.direction !== (m.range.direction ?? "FORWARD") ||
+          existing.assessment !== (m.assessment ?? null) ||
           existing.startSurah !== m.range.startSurah ||
           existing.startAyah !== m.range.startAyah ||
           existing.endSurah !== m.range.endSurah ||
@@ -192,21 +279,48 @@ export async function mutateDay(
         data: {
           dailyStatusId: status.id,
           kind: m.kind,
+          assessment: m.assessment,
           ...m.range,
+          direction: m.range.direction ?? "FORWARD",
           requestKey: m.requestKey,
           pageAmount: pages.amount,
           pageMappingVersion: pages.version,
         },
       });
     }
-    if (m.action === "status") {
-      if (m.outcome === "ABSENT" && status.entries.length)
-        throw new HttpError(409, "يوجد تسميع اليوم؛ اختر حفظ أو لم يحفظ");
+    if (
+      m.action === "assessment" &&
+      !status.entries.some((e) => e.kind === m.kind)
+    )
+      throw new HttpError(409, "سجل مدى التسميع أولًا قبل تعديل النتيجة");
+    if (m.action === "assessment" || (m.action === "entry" && m.assessment)) {
+      if (status.outcome === "ABSENT")
+        throw new HttpError(409, "ألغِ الغياب أولًا قبل تسجيل النتيجة");
+      const memory =
+        m.kind === "MEMORIZATION" ? m.assessment! : status.memorizationResult;
+      const review = m.kind === "REVIEW" ? m.assessment! : status.reviewResult;
       await tx.dailyStudentStatus.update({
         where: { id: status.id },
-        data: { outcome: m.outcome, note: m.note },
+        data: {
+          memorizationResult: memory,
+          reviewResult: review,
+          outcome: independentSummary(memory, review),
+        },
       });
-      if (m.carry && m.outcome === "ABSENT") {
+    }
+    if (
+      (m.action === "assessment" || m.action === "entry") &&
+      m.kind === "MEMORIZATION" &&
+      m.assessment
+    ) {
+      const where = {
+        enrollmentId_dueDate: {
+          enrollmentId: m.enrollmentId,
+          dueDate: dayDate(nextDay(m.date)),
+        },
+      };
+      const tomorrow = await tx.assignment.findUnique({ where });
+      if (m.assessment === "NOT_MASTERED") {
         const today = await tx.assignment.findUnique({
           where: {
             enrollmentId_dueDate: {
@@ -215,7 +329,77 @@ export async function mutateDay(
             },
           },
         });
-        if (today)
+        const last = [...status.entries]
+          .reverse()
+          .find((e) => e.kind === "MEMORIZATION");
+        const candidate =
+          m.action === "entry"
+            ? m.range
+            : last
+              ? {
+                  ...(last.direction === "REVERSE"
+                    ? { direction: "REVERSE" as const }
+                    : {}),
+                  startSurah: last.startSurah,
+                  startAyah: last.startAyah,
+                  endSurah: last.endSurah,
+                  endAyah: last.endAyah,
+                }
+              : today?.memorization;
+        const range = rangeSchema.safeParse(candidate);
+        if (range.success) {
+          await tx.assignment.upsert({
+            where,
+            create: {
+              enrollmentId: m.enrollmentId,
+              dueDate: dayDate(nextDay(m.date)),
+              memorization: range.data,
+              autoMemorizationStatusId: status.id,
+            },
+            update: {
+              memorization: range.data,
+              autoMemorizationStatusId: status.id,
+              memorizationManual: false,
+              carriedFromId: null,
+            },
+          });
+        }
+      } else if (
+        tomorrow?.autoMemorizationStatusId === status.id &&
+        !tomorrow.memorizationManual
+      ) {
+        await tx.assignment.update({
+          where,
+          data: { memorization: Prisma.DbNull, autoMemorizationStatusId: null },
+        });
+      }
+    }
+    if (m.action === "status") {
+      if (m.outcome === "ABSENT" && status.entries.length)
+        throw new HttpError(
+          409,
+          "يوجد تسميع اليوم؛ لا يمكن تسجيل الغياب بعد التسميع",
+        );
+      await tx.dailyStudentStatus.update({
+        where: { id: status.id },
+        data: {
+          outcome: m.outcome,
+          note: m.note,
+          ...(status.outcome === "ABSENT" && m.outcome === null
+            ? { memorizationResult: null, reviewResult: null }
+            : {}),
+        },
+      });
+      if (m.outcome === "ABSENT") {
+        const today = await tx.assignment.findUnique({
+          where: {
+            enrollmentId_dueDate: {
+              enrollmentId: m.enrollmentId,
+              dueDate: dayDate(m.date),
+            },
+          },
+        });
+        if (today && (today.memorization || today.review))
           await tx.assignment.upsert({
             where: {
               enrollmentId_dueDate: {
@@ -243,6 +427,8 @@ export async function mutateDay(
         note: m.note.trim(),
         imageName: m.imageName.trim(),
         carriedFromId: null,
+        autoMemorizationStatusId: null,
+        memorizationManual: true,
       };
       await tx.assignment.upsert({
         where: {

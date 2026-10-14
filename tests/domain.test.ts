@@ -37,9 +37,8 @@ test("cross-surah range counts both endpoints", () => {
     5,
   );
 });
-test("reverse ranges, fractions and invalid chapters rejected", () => {
+test("reversed verses, fractions and invalid chapters rejected", () => {
   for (const range of [
-    { startSurah: 68, startAyah: 1, endSurah: 67, endAyah: 30 },
     { startSurah: 67, startAyah: 20, endSurah: 67, endAyah: 10 },
     { startSurah: 0, startAyah: 1, endSurah: 1, endAyah: 7 },
     { startSurah: 67, startAyah: 1.5, endSurah: 67, endAyah: 30 },
@@ -62,7 +61,7 @@ test("layout-derived pages are versioned and custom maps still work", () => {
 test("calendar rollover uses institution timezone", () => {
   assert.equal(
     dayKey(new Date("2026-10-13T21:30:00Z"), "Europe/Istanbul"),
-    "2026-10-14",
+    "2026-10-13",
   );
   assert.equal(nextDay("2026-12-31"), "2027-01-01");
   assert.equal(nextDay("2028-02-28"), "2028-02-29");
