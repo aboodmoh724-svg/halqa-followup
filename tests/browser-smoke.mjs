@@ -183,6 +183,42 @@ try {
     assert.equal(day.students[0].reviewResult, "NOT_MASTERED");
     assert.equal(day.students[0].entries.length, 3);
     assert.equal(day.students[0].entries[2].assessment, "NOT_MASTERED");
+    await page
+      .getByRole("button", { name: "تعديل التسميع", exact: true })
+      .first()
+      .click();
+    assert.equal(
+      await dialog.getByRole("spinbutton").nth(1).inputValue(),
+      "17",
+    );
+    await dialog.getByRole("spinbutton").nth(1).fill("16");
+    await dialog
+      .getByRole("button", { name: "حفظ", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    const edited = await (await context.request.get(url)).json();
+    assert.equal(edited.students[0].entries.length, 3);
+    assert.equal(
+      edited.students[0].entries[0].id,
+      day.students[0].entries[0].id,
+    );
+    assert.equal(edited.students[0].entries[0].endAyah, 16);
+    assert.ok(
+      edited.students[0].entries[0].pageAmount <
+        day.students[0].entries[0].pageAmount,
+    );
+    assert.equal(edited.students[0].memorizationResult, "MASTERED");
+    await page
+      .getByRole("button", { name: "تعديل التسميع", exact: true })
+      .first()
+      .click();
+    await dialog.getByRole("spinbutton").nth(1).fill("17");
+    await page.screenshot({ path: "work/smoke/edit-recitation.png" });
+    await dialog
+      .getByRole("button", { name: "حفظ", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+
     await page.locator(".assessment-tile").first().click();
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
     await dialog

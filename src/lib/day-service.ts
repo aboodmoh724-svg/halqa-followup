@@ -218,6 +218,40 @@ export async function mutateDay(
       include: { entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
     });
     if (!status) throw new HttpError(404, "الطالب غير موجود في هذه الحلقة");
+    if (m.action === "edit-entry") {
+      if (status.outcome === "ABSENT")
+        throw new HttpError(409, "ألغِ الغياب أولًا قبل تعديل التسميع");
+      const entry = status.entries.find((e) => e.id === m.entryId);
+      if (!entry)
+        throw new HttpError(404, "التسميع غير موجود لهذا الطالب في هذا اليوم");
+      const pages = pageAmount(m.range)!;
+      await tx.recitationEntry.update({
+        where: { id: entry.id },
+        data: {
+          ...m.range,
+          pageAmount: pages.amount,
+          pageMappingVersion: pages.version,
+        },
+      });
+      const lastMemory = [...status.entries]
+        .reverse()
+        .find((e) => e.kind === "MEMORIZATION");
+      if (
+        entry.kind === "MEMORIZATION" &&
+        lastMemory?.id === entry.id &&
+        status.memorizationResult === "NOT_MASTERED"
+      ) {
+        await tx.assignment.updateMany({
+          where: {
+            enrollmentId: m.enrollmentId,
+            dueDate: dayDate(nextDay(m.date)),
+            autoMemorizationStatusId: status.id,
+            memorizationManual: false,
+          },
+          data: { memorization: m.range },
+        });
+      }
+    }
     if (m.action === "entry") {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل التسميع");

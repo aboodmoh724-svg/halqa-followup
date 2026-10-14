@@ -61,6 +61,13 @@ export type DayView = {
 };
 export const mutationSchema = z.discriminatedUnion("action", [
   z.object({
+    action: z.literal("edit-entry"),
+    enrollmentId: z.string().min(1),
+    date: z.string(),
+    entryId: z.string().min(1),
+    range: rangeSchema,
+  }),
+  z.object({
     action: z.literal("entry"),
     enrollmentId: z.string().min(1),
     date: z.string(),

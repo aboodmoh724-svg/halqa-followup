@@ -34,6 +34,7 @@ import {
 } from "@/lib/types";
 type Teacher = { name: string; halqas: { id: string; name: string }[] };
 type Mode =
+  | "edit-entry"
   | "memory"
   | "review"
   | "memory-result"
@@ -152,6 +153,7 @@ function RangeFields({
 }
 function Sheet({
   mode,
+  entry,
   student,
   busy,
   onClose,
@@ -160,6 +162,7 @@ function Sheet({
 }: {
   saveError: string | null;
   mode: Mode;
+  entry?: StudentView["entries"][number];
   student: StudentView;
   busy: boolean;
   onClose: (next?: Mode) => void;
@@ -167,7 +170,8 @@ function Sheet({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [range, setRange] = useState(
-    student.today?.[mode === "review" ? "review" : "memorization"] ??
+    entry ??
+      student.today?.[mode === "review" ? "review" : "memorization"] ??
       initialRange,
   );
   const [memory, setMemory] = useState(
@@ -205,6 +209,7 @@ function Sheet({
     requestKey.current = crypto.randomUUID();
   }, []);
   const titles = {
+    "edit-entry": "تعديل مدى التسميع",
     memory: "إضافة حفظ جديد",
     review: "إضافة مراجعة",
     "memory-result": "تعديل نتيجة الحفظ",
@@ -216,6 +221,27 @@ function Sheet({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (mode === "edit-entry") {
+      const result = rangeSchema.safeParse(range);
+      if (!result.success) {
+        setError(result.error.issues[0].message);
+        return;
+      }
+      if (!entry) {
+        setError("التسميع غير موجود");
+        return;
+      }
+      if (
+        await onSave({
+          action: "edit-entry",
+          entryId: entry.id,
+          enrollmentId: student.enrollmentId,
+          range: result.data,
+        })
+      )
+        onClose();
+      return;
+    }
     let data: Record<string, unknown>;
     if (mode === "memory" || mode === "review" || resultOnly) {
       if (assessment !== "MASTERED" && assessment !== "NOT_MASTERED") {
@@ -305,6 +331,19 @@ function Sheet({
             ×
           </button>
         </div>
+        {mode === "edit-entry" && (
+          <>
+            <p className="notice">
+              صحّح السورة والآيات؛ يُعاد حساب المقدار دون إضافة تسميع جديد. تبقى
+              نتيجة حافظ / غير حافظ كما هي، ويمكن تعديلها من نتائج اليوم.
+            </p>
+            <RangeFields
+              title="مدى التسميع"
+              value={range}
+              onChange={setRange}
+            />
+          </>
+        )}
         {(mode === "memory" || mode === "review" || resultOnly) && (
           <>
             <p className="notice">
@@ -448,6 +487,7 @@ export default function TeacherFlow() {
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "student" | "summary">("list");
   const [mode, setMode] = useState<Mode | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -873,6 +913,16 @@ export default function TeacherFlow() {
                         </span>
                       )}
                     </p>
+                    <button
+                      className="text-button"
+                      disabled={busy || locked}
+                      onClick={() => {
+                        setEditingEntryId(e.id);
+                        setMode("edit-entry");
+                      }}
+                    >
+                      تعديل التسميع
+                    </button>
                   </article>
                 ))}
                 {!student.entries.length && (
@@ -980,8 +1030,13 @@ export default function TeacherFlow() {
           )}
           {mode && !locked && (
             <Sheet
-              key={`${student.enrollmentId}-${mode}`}
+              key={`${student.enrollmentId}-${mode}-${mode === "edit-entry" ? editingEntryId : ""}`}
               mode={mode}
+              entry={
+                mode === "edit-entry"
+                  ? student.entries.find((e) => e.id === editingEntryId)
+                  : undefined
+              }
               student={student}
               busy={busy}
               onClose={(next) => setMode(next ?? null)}
@@ -1167,8 +1222,9 @@ export default function TeacherFlow() {
                 غير حافظ.
               </li>
               <li>
-                يمكنك إضافة تسميع آخر في اليوم نفسه. ولتصحيح النتيجة فقط، استخدم
-                بطاقة نتائج اليوم؛ لا تُضاف صفحات جديدة.
+                يمكنك إضافة تسميع آخر في اليوم نفسه. لتصحيح السورة والآيات، اضغط
+                «تعديل التسميع» تحت التسجيل. ولتصحيح النتيجة فقط، استخدم بطاقة
+                نتائج اليوم؛ لا تُضاف صفحات جديدة.
               </li>
               <li>
                 إذا كان الطالب غير حافظ للدرس الجديد، يُضاف الدرس تلقائيًا إلى
