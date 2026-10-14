@@ -58,28 +58,28 @@ export const rangeSchema = z
         path: ["endAyah"],
         message: "آية النهاية غير صحيحة لهذه السورة",
       });
-    if (
-      (r.direction === "REVERSE"
-        ? r.endSurah > r.startSurah
-        : r.endSurah < r.startSurah) ||
-      (r.endSurah === r.startSurah && r.endAyah < r.startAyah)
-    )
+    if (r.endSurah === r.startSurah && r.endAyah < r.startAyah)
       ctx.addIssue({
         code: "custom",
-        message:
-          "اختر سور البداية والنهاية وفق الاتجاه المحدد؛ داخل السورة تُقرأ الآيات بترتيبها الطبيعي",
+        message: "داخل السورة، آية النهاية يجب أن تأتي بعد آية البداية",
       });
+  })
+  .transform((r) => {
+    const normalized = { ...r };
+    if (r.startSurah > r.endSurah) normalized.direction = "REVERSE";
+    else delete normalized.direction;
+    return normalized;
   });
 export type QuranRange = z.infer<typeof rangeSchema>;
 export function rangeText(r: QuranRange | null | undefined) {
   if (!r) return "لم يحدد";
   return r.startSurah === r.endSurah
     ? `${names[r.startSurah - 1]} ${r.startAyah} – ${r.endAyah}`
-    : `${names[r.startSurah - 1]} ${r.startAyah} إلى ${names[r.endSurah - 1]} ${r.endAyah}${r.direction === "REVERSE" ? " · بعكس ترتيب السور" : ""}`;
+    : `${names[r.startSurah - 1]} ${r.startAyah} إلى ${names[r.endSurah - 1]} ${r.endAyah}${r.startSurah > r.endSurah ? " · بعكس ترتيب السور" : ""}`;
 }
 export function rangeSegments(r: QuranRange) {
   rangeSchema.parse(r);
-  const step = r.direction === "REVERSE" ? -1 : 1;
+  const step = r.startSurah > r.endSurah ? -1 : 1;
   const segments: { surah: number; startAyah: number; endAyah: number }[] = [];
   for (let surah = r.startSurah; ; surah += step) {
     segments.push({

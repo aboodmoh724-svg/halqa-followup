@@ -219,9 +219,12 @@ try {
       .getByRole("button", { name: "تعديل التسميع", exact: true })
       .last()
       .click();
-    await dialog
-      .getByRole("button", { name: "بعكس ترتيب السور", exact: true })
-      .click();
+    assert.equal(
+      await dialog
+        .getByRole("button", { name: "بعكس ترتيب السور", exact: true })
+        .count(),
+      0,
+    );
     await dialog.getByRole("combobox").nth(0).selectOption("92");
     await dialog.getByRole("combobox").nth(1).selectOption("78");
     await dialog.getByRole("spinbutton").nth(0).fill("1");
@@ -244,9 +247,7 @@ try {
       .getByRole("button", { name: "تعديل التسميع", exact: true })
       .last()
       .click();
-    await dialog
-      .getByRole("button", { name: "بترتيب المصحف", exact: true })
-      .click();
+
     await dialog.getByRole("combobox").nth(0).selectOption("68");
     await dialog.getByRole("combobox").nth(1).selectOption("68");
     await dialog.getByRole("spinbutton").nth(1).fill("25");

@@ -97,32 +97,6 @@ function RangeFields({
   return (
     <fieldset className="range-fields">
       <legend>{title}</legend>
-      <fieldset className="assessment-picker">
-        <legend>اتجاه السور</legend>
-        <div className="assessment-options">
-          {(["FORWARD", "REVERSE"] as const).map((direction) => (
-            <button
-              type="button"
-              key={direction}
-              className="assessment-choice"
-              aria-pressed={(value.direction ?? "FORWARD") === direction}
-              onClick={() => {
-                const next = { ...value };
-                if (direction === "REVERSE") next.direction = direction;
-                else delete next.direction;
-                onChange(next);
-              }}
-            >
-              {direction === "FORWARD" ? "بترتيب المصحف" : "بعكس ترتيب السور"}
-            </button>
-          ))}
-        </div>
-        <p className="subtle">
-          {value.direction === "REVERSE"
-            ? "من الناس باتجاه البقرة؛ آيات كل سورة بترتيبها الطبيعي."
-            : "من البقرة باتجاه الناس."}
-        </p>
-      </fieldset>
       <div className="range-grid">
         {(["start", "end"] as const).map((side) => (
           <div className="contents" key={side}>
@@ -132,10 +106,7 @@ function RangeFields({
                 value={value[`${side}Surah`]}
                 onChange={(e) => surahChange(side, Number(e.target.value))}
               >
-                {(value.direction === "REVERSE"
-                  ? [...surahs].reverse()
-                  : surahs
-                ).map((s) => (
+                {surahs.map((s) => (
                   <option value={s.id} key={s.id}>
                     {s.name}
                   </option>

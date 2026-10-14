@@ -69,12 +69,27 @@ test("reverse surahs include every verse once and preserve forward page totals",
 });
 test("direction validates endpoints while verses inside each surah stay ascending", () => {
   assert.equal(
-    rangeSchema.safeParse({ ...reverse, direction: "FORWARD" }).success,
-    false,
+    rangeSchema.parse({ ...reverse, direction: undefined }).direction,
+    "REVERSE",
   );
   assert.equal(
-    rangeSchema.safeParse({ ...reverse, direction: undefined }).success,
-    false,
+    rangeSchema.parse({ ...reverse, direction: "FORWARD" }).direction,
+    "REVERSE",
+  );
+  assert.equal(
+    rangeSchema.parse({
+      startSurah: 78,
+      startAyah: 1,
+      endSurah: 92,
+      endAyah: 21,
+      direction: "REVERSE",
+    }).direction,
+    undefined,
+  );
+  assert.equal(
+    pageAmount({ startSurah: 92, startAyah: 1, endSurah: 78, endAyah: 40 })!
+      .amount,
+    pageAmount(reverse)!.amount,
   );
   assert.equal(
     rangeSchema.safeParse({ ...reverse, startAyah: 22 }).success,
@@ -85,8 +100,13 @@ test("direction validates endpoints while verses inside each surah stay ascendin
     false,
   );
   assert.equal(
-    rangeSchema.safeParse({ ...reverse, startSurah: 78, endSurah: 92 }).success,
-    false,
+    rangeSchema.safeParse({
+      ...reverse,
+      startSurah: 78,
+      endSurah: 92,
+      endAyah: 21,
+    }).success,
+    true,
   );
   assert.equal(
     ayahAmount({
@@ -140,7 +160,7 @@ test(
         enrollmentId: enrollment.id,
         kind: "MEMORIZATION",
         assessment: "NOT_MASTERED",
-        range: reverse,
+        range: { startSurah: 92, startAyah: 1, endSurah: 78, endAyah: 40 },
         requestKey: randomUUID(),
       };
       await mutateDay(teacher.id, halqa.id, input, now);
@@ -153,13 +173,15 @@ test(
         pageAmount(reverse)!.amount,
       );
       assert.deepEqual(day.students[0].tomorrow?.memorization, reverse);
-      await assert.rejects(() =>
-        mutateDay(
-          teacher.id,
-          halqa.id,
-          { ...input, range: { ...reverse, direction: "FORWARD" } },
-          now,
-        ),
+      await mutateDay(
+        teacher.id,
+        halqa.id,
+        { ...input, range: { ...reverse, direction: "FORWARD" } },
+        now,
+      );
+      assert.equal(
+        (await getDay(teacher.id, halqa.id)).students[0].entries.length,
+        1,
       );
       const corrected = { ...reverse, startAyah: 10, endAyah: 5 };
       await mutateDay(
