@@ -397,6 +397,7 @@ try {
     await page
       .getByRole("button", { name: "تحديث اليوم", exact: true })
       .click();
+    await page.locator('main[aria-busy="false"]').waitFor();
     await page
       .getByRole("button", { name: new RegExp(lastStudent.name) })
       .click();
