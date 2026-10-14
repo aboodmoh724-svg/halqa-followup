@@ -6,6 +6,21 @@ export const labels = {
   ABSENT: "غائب",
 } as const;
 export type Outcome = keyof typeof labels;
+export const assessmentLabels = {
+  MASTERED: "أتقن",
+  NOT_MASTERED: "لم يتقن",
+  NOT_REQUIRED: "غير مطلوب اليوم",
+} as const;
+export type Assessment = keyof typeof assessmentLabels;
+export function independentSummary(
+  memory: string | null | undefined,
+  review: string | null | undefined,
+): Outcome | null {
+  if (!memory || !review) return null;
+  return memory === "NOT_MASTERED" || review === "NOT_MASTERED"
+    ? "NOT_MEMORIZED"
+    : "MEMORIZED";
+}
 export type AssignmentView = {
   id: string;
   memorization: QuranRange | null;
@@ -14,6 +29,7 @@ export type AssignmentView = {
   imageName: string;
 };
 export type EntryView = QuranRange & {
+  assessment?: string | null;
   id: string;
   kind: "MEMORIZATION" | "REVIEW";
   createdAt: string;
@@ -21,6 +37,8 @@ export type EntryView = QuranRange & {
   pageMappingVersion: string | null;
 };
 export type StudentView = {
+  memorizationResult?: string | null;
+  reviewResult?: string | null;
   enrollmentId: string;
   name: string;
   outcome: Outcome | null;
@@ -44,8 +62,16 @@ export const mutationSchema = z.discriminatedUnion("action", [
     enrollmentId: z.string().min(1),
     date: z.string(),
     kind: z.enum(["MEMORIZATION", "REVIEW"]),
+    assessment: z.enum(["MASTERED", "NOT_MASTERED"]).optional(),
     range: rangeSchema,
     requestKey: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("assessment"),
+    enrollmentId: z.string().min(1),
+    date: z.string(),
+    kind: z.enum(["MEMORIZATION", "REVIEW"]),
+    assessment: z.enum(["MASTERED", "NOT_MASTERED", "NOT_REQUIRED"]),
   }),
   z.object({
     action: z.literal("status"),

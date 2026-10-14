@@ -80,6 +80,8 @@ model DailyStudentStatus {
   session DailySession @relation(fields: [sessionId, halqaId], references: [id, halqaId])
   enrollment Enrollment @relation(fields: [enrollmentId, halqaId], references: [id, halqaId])
   outcome Outcome?
+  memorizationResult String?
+  reviewResult String?
   note String @default("")
   updatedAt DateTime @updatedAt
   entries RecitationEntry[]
@@ -91,6 +93,7 @@ model RecitationEntry {
   dailyStatusId String
   dailyStatus DailyStudentStatus @relation(fields: [dailyStatusId], references: [id])
   kind RecitationKind
+  assessment String?
   startSurah Int
   startAyah Int
   endSurah Int

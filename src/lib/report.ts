@@ -11,7 +11,13 @@ import {
   formatPages,
   rangeDescription,
 } from "./quran";
-import { labels, type DayView, type StudentView } from "./types";
+import {
+  assessmentLabels,
+  type Assessment,
+  labels,
+  type DayView,
+  type StudentView,
+} from "./types";
 function escape(value: string) {
   return value.replace(
     /[&<>"']/g,
@@ -40,10 +46,10 @@ export function reportMarkup(
           .filter((e) => e.kind === kind)
           .map(
             (e) =>
-              `<li>${escape(rangeText(e))}<span>${formatPages(entryPages(e))} صفحة · ${ayahAmount(e)} آية</span></li>`,
+              `<li>${escape(rangeText(e))}<span>${formatPages(entryPages(e))} صفحة · ${ayahAmount(e)} آية${e.assessment ? ` · ${assessmentLabels[e.assessment as Assessment]}` : ""}</span></li>`,
           )
           .join("") || "<li class='muted'>لا يوجد تسميع مسجل</li>";
-      return `<section class="page"><div class="content"><header><div class="brand">${escape(academyName)}</div><p>${escape(day.halqaName)} · ${escape(date)}</p></header><h1>${escape(s.name)}</h1><div class="status ${s.outcome}">${s.outcome ? labels[s.outcome] : "بانتظار النتيجة"}</div><div class="actual"><article><h2>الحفظ الذي سمعه</h2><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "MEMORIZATION")))} صفحة</p><ul>${entries("MEMORIZATION")}</ul></article><article><h2>المراجعة</h2><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "REVIEW")))} صفحة</p><ul>${entries("REVIEW")}</ul></article></div><article class="assignment"><h2>واجب الغد</h2><p><b>الحفظ:</b> ${escape(rangeDescription(s.tomorrow?.memorization))}</p><p><b>المراجعة:</b> ${escape(rangeDescription(s.tomorrow?.review))}</p>${s.tomorrow?.note ? `<p class="note"><b>ملاحظة الواجب:</b> ${escape(s.tomorrow.note)}</p>` : ""}</article>${s.note ? `<article><h2>ملاحظة اليوم</h2><p class="note">${escape(s.note)}</p></article>` : ""}</div><footer>${escape(day.teacherName)}<span>تقرير المتابعة اليومي · ${escape(date)}</span></footer></section>`;
+      return `<section class="page"><div class="content"><header><div class="brand">${escape(academyName)}</div><p>${escape(day.halqaName)} · ${escape(date)}</p></header><h1>${escape(s.name)}</h1><div class="status ${s.outcome}">${s.outcome === "ABSENT" ? "غائب" : s.memorizationResult || s.reviewResult ? "نتائج الحفظ والمراجعة" : s.outcome ? `نتيجة سابقة: ${labels[s.outcome]}` : "بانتظار النتيجة"}</div><div class="actual"><article><h2>الحفظ الذي سمعه</h2><p class="assessment">النتيجة: ${s.outcome === "ABSENT" ? "غائب" : s.memorizationResult ? assessmentLabels[s.memorizationResult as Assessment] : "لم تُسجل نتيجة مستقلة"}</p><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "MEMORIZATION")))} صفحة</p><ul>${entries("MEMORIZATION")}</ul></article><article><h2>المراجعة</h2><p class="assessment">النتيجة: ${s.outcome === "ABSENT" ? "غائب" : s.reviewResult ? assessmentLabels[s.reviewResult as Assessment] : "لم تُسجل نتيجة مستقلة"}</p><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "REVIEW")))} صفحة</p><ul>${entries("REVIEW")}</ul></article></div><article class="assignment"><h2>واجب الغد</h2><p><b>الحفظ:</b> ${escape(rangeDescription(s.tomorrow?.memorization))}</p><p><b>المراجعة:</b> ${escape(rangeDescription(s.tomorrow?.review))}</p>${s.tomorrow?.note ? `<p class="note"><b>ملاحظة الواجب:</b> ${escape(s.tomorrow.note)}</p>` : ""}</article>${s.note ? `<article><h2>ملاحظة اليوم</h2><p class="note">${escape(s.note)}</p></article>` : ""}</div><footer>${escape(day.teacherName)}<span>تقرير المتابعة اليومي · ${escape(date)}</span></footer></section>`;
     })
     .join("");
   return `<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><style>${fontCss}

@@ -63,23 +63,33 @@ try {
   const dialog = page.getByRole("dialog");
   assert.equal(await dialog.getByRole("spinbutton").nth(0).inputValue(), "10");
   assert.equal(await dialog.getByRole("spinbutton").nth(1).inputValue(), "20");
+  await dialog
+    .getByRole("button", { name: "حفظ التسجيل", exact: true })
+    .click();
+  await dialog.getByText("اختر نتيجة التسميع أولًا").waitFor();
+  await page.screenshot({ path: "work/smoke/assessment-dialog.png" });
   await dialog.getByRole("spinbutton").nth(1).fill("17");
-  await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+  await dialog.getByRole("button", { name: "أتقن", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "حفظ التسجيل", exact: true })
+    .click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
   await dialog.getByRole("spinbutton").nth(0).fill("18");
-  await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+  await dialog.getByRole("button", { name: "أتقن", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "حفظ التسجيل", exact: true })
+    .click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
   assert.equal(await dialog.getByRole("combobox").nth(0).inputValue(), "68");
-  await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+  await dialog.getByRole("button", { name: "لم يتقن", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "حفظ التسجيل", exact: true })
+    .click();
   await dialog.waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: "حفظ", exact: true }).click();
-  await page.waitForFunction(
-    () => document.querySelector("[aria-pressed=true]")?.textContent === "حفظ",
-  );
   await page.getByRole("button", { name: "+ واجب الغد", exact: true }).click();
-  await dialog.getByLabel("اسم الصورة (نص فقط)").fill("17");
+  assert.equal(await dialog.getByLabel("اسم الصورة (نص فقط)").count(), 0);
   await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
   await page
@@ -110,6 +120,10 @@ try {
   const id = teacher.halqas[0].id;
   const url = `${base}/api/halqas/${id}`;
   let day = await (await context.request.get(url)).json();
+  assert.equal(day.students[0].memorizationResult, "MASTERED");
+  assert.equal(day.students[0].reviewResult, "NOT_MASTERED");
+  assert.equal(day.students[0].entries.length, 3);
+  assert.equal(day.students[0].entries[2].assessment, "NOT_MASTERED");
   const post = (data) =>
     context.request.post(url, {
       data: { ...data, date: day.date },
@@ -134,6 +148,57 @@ try {
         ).status(),
         200,
       );
+  await page
+    .getByRole("button", { name: "الطالب التالي", exact: true })
+    .click();
+  await page.getByRole("button", { name: "غائب اليوم", exact: true }).click();
+  await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+  await page.getByText("الطالب غائب اليوم", { exact: true }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "+ حفظ جديد", exact: true })
+      .isVisible(),
+    false,
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "+ مراجعة", exact: true })
+      .isVisible(),
+    false,
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "+ واجب الغد", exact: true })
+      .isVisible(),
+    true,
+  );
+  await page.screenshot({ path: "work/smoke/absence.png" });
+  await page
+    .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
+    .click();
+  await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "غير مطلوب اليوم", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "حفظ التسجيل", exact: true })
+    .click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
+  await dialog.getByRole("button", { name: "لم يتقن", exact: true }).click();
+  await dialog.getByLabel("سمّع الطالب آيات اليوم").uncheck();
+  await dialog
+    .getByRole("button", { name: "حفظ التسجيل", exact: true })
+    .click();
+  await dialog.waitFor({ state: "hidden" });
+  const after = await (await context.request.get(url)).json();
+  assert.equal(after.students[1].entries.length, 0);
+  assert.equal(after.students[1].memorizationResult, "NOT_REQUIRED");
+  assert.equal(after.students[1].reviewResult, "NOT_MASTERED");
+  await page.screenshot({
+    path: "work/smoke/no-recitation-result.png",
+    fullPage: true,
+  });
   const all = await context.request.get(`${url}/report?date=${day.date}`, {
     timeout: 90000,
   });

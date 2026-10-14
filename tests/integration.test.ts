@@ -151,6 +151,41 @@ test(
       const tomorrow = await getDay(teacher.id, halqa.id, nextDay(today));
       assert.deepEqual(tomorrow.students[0].today?.memorization, nextRange);
       assert.equal(tomorrow.students[0].entries.length, 0);
+      await mutateDay(teacher.id, halqa.id, {
+        action: "assessment",
+        date: today,
+        enrollmentId: enrollment.id,
+        kind: "MEMORIZATION",
+        assessment: "MASTERED",
+      });
+      day = await getDay(teacher.id, halqa.id);
+      assert.equal(day.students[0].outcome, null);
+      await assert.rejects(
+        () => mutateDay(teacher.id, halqa.id, { action: "close", date: today }),
+        /بدون نتيجة/,
+      );
+      await mutateDay(teacher.id, halqa.id, {
+        action: "assessment",
+        date: today,
+        enrollmentId: enrollment.id,
+        kind: "REVIEW",
+        assessment: "NOT_MASTERED",
+      });
+      day = await getDay(teacher.id, halqa.id);
+      assert.equal(day.students[0].memorizationResult, "MASTERED");
+      assert.equal(day.students[0].reviewResult, "NOT_MASTERED");
+      assert.equal(day.students[0].outcome, "NOT_MEMORIZED");
+      assert.equal(day.students[0].entries.length, 2);
+      await mutateDay(teacher.id, halqa.id, {
+        action: "assessment",
+        date: today,
+        enrollmentId: enrollment.id,
+        kind: "REVIEW",
+        assessment: "NOT_REQUIRED",
+      });
+      day = await getDay(teacher.id, halqa.id);
+      assert.equal(day.students[0].reviewResult, "NOT_REQUIRED");
+      assert.equal(day.students[0].outcome, "MEMORIZED");
       await mutateDay(teacher.id, halqa.id, { action: "close", date: today });
       day = await getDay(teacher.id, halqa.id);
       assert.ok(day.closedAt);

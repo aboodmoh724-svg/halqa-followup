@@ -2,7 +2,12 @@ import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { HttpError } from "./auth";
 import { dayDate, dayKey, nextDay } from "./dates";
-import { mutationSchema, type DayView, type AssignmentView } from "./types";
+import {
+  mutationSchema,
+  independentSummary,
+  type DayView,
+  type AssignmentView,
+} from "./types";
 import { rangeSchema, pageAmount } from "./quran";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -112,10 +117,13 @@ export async function getDay(
       enrollmentId: s.enrollmentId,
       name: s.enrollment.student.name,
       outcome: s.outcome,
+      memorizationResult: s.memorizationResult,
+      reviewResult: s.reviewResult,
       note: s.note,
       entries: s.entries.map((e) => ({
         id: e.id,
         kind: e.kind,
+        assessment: e.assessment,
         startSurah: e.startSurah,
         startAyah: e.startAyah,
         endSurah: e.endSurah,
@@ -179,6 +187,7 @@ export async function mutateDay(
         if (
           existing.dailyStatusId !== status.id ||
           existing.kind !== m.kind ||
+          existing.assessment !== (m.assessment ?? null) ||
           existing.startSurah !== m.range.startSurah ||
           existing.startAyah !== m.range.startAyah ||
           existing.endSurah !== m.range.endSurah ||
@@ -192,10 +201,32 @@ export async function mutateDay(
         data: {
           dailyStatusId: status.id,
           kind: m.kind,
+          assessment: m.assessment,
           ...m.range,
           requestKey: m.requestKey,
           pageAmount: pages.amount,
           pageMappingVersion: pages.version,
+        },
+      });
+    }
+    if (
+      m.action === "assessment" &&
+      m.assessment === "MASTERED" &&
+      !status.entries.some((e) => e.kind === m.kind)
+    )
+      throw new HttpError(409, "سجل التسميع أولًا قبل الإتقان");
+    if (m.action === "assessment" || (m.action === "entry" && m.assessment)) {
+      if (status.outcome === "ABSENT")
+        throw new HttpError(409, "ألغِ الغياب أولًا قبل تسجيل النتيجة");
+      const memory =
+        m.kind === "MEMORIZATION" ? m.assessment! : status.memorizationResult;
+      const review = m.kind === "REVIEW" ? m.assessment! : status.reviewResult;
+      await tx.dailyStudentStatus.update({
+        where: { id: status.id },
+        data: {
+          memorizationResult: memory,
+          reviewResult: review,
+          outcome: independentSummary(memory, review),
         },
       });
     }
@@ -204,7 +235,13 @@ export async function mutateDay(
         throw new HttpError(409, "يوجد تسميع اليوم؛ اختر حفظ أو لم يحفظ");
       await tx.dailyStudentStatus.update({
         where: { id: status.id },
-        data: { outcome: m.outcome, note: m.note },
+        data: {
+          outcome: m.outcome,
+          note: m.note,
+          ...(status.outcome === "ABSENT" && m.outcome === null
+            ? { memorizationResult: null, reviewResult: null }
+            : {}),
+        },
       });
       if (m.carry && m.outcome === "ABSENT") {
         const today = await tx.assignment.findUnique({

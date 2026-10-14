@@ -1,4 +1,12 @@
 "use client";
+import {
+  BookOpen,
+  RotateCcw,
+  CalendarDays,
+  UserRoundX,
+  CheckCheck,
+  ClipboardList,
+} from "lucide-react";
 import { academyName } from "@/lib/branding";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
@@ -15,6 +23,8 @@ import {
 } from "@/lib/quran";
 import {
   labels,
+  assessmentLabels,
+  type Assessment,
   type DayView,
   type Outcome,
   type StudentView,
@@ -168,6 +178,8 @@ function Sheet({
     mode === "assignment" ? (student.tomorrow?.note ?? "") : student.note,
   );
   const imageName = student.tomorrow?.imageName ?? "";
+  const [assessment, setAssessment] = useState<Assessment | "">("");
+  const [recited, setRecited] = useState(true);
   const [carry, setCarry] = useState(true);
   const [error, setError] = useState("");
   const requestKey = useRef<string>("");
@@ -187,6 +199,32 @@ function Sheet({
     setError("");
     let data: Record<string, unknown>;
     if (mode === "memory" || mode === "review") {
+      if (!assessment) {
+        setError("اختر نتيجة التسميع أولًا");
+        return;
+      }
+      if (
+        !recited &&
+        assessment === "MASTERED" &&
+        !student.entries.some(
+          (e) => e.kind === (mode === "memory" ? "MEMORIZATION" : "REVIEW"),
+        )
+      ) {
+        setError("لتسجيل الإتقان، أدخل الآيات التي سمعها الطالب");
+        return;
+      }
+      if (!recited || assessment === "NOT_REQUIRED") {
+        if (
+          await onSave({
+            action: "assessment",
+            kind: mode === "memory" ? "MEMORIZATION" : "REVIEW",
+            assessment,
+            enrollmentId: student.enrollmentId,
+          })
+        )
+          onClose();
+        return;
+      }
       const result = rangeSchema.safeParse(range);
       if (!result.success) {
         setError(result.error.issues[0].message);
@@ -194,6 +232,7 @@ function Sheet({
       }
       data = {
         action: "entry",
+        assessment,
         kind: mode === "memory" ? "MEMORIZATION" : "REVIEW",
         range: result.data,
         requestKey: requestKey.current,
@@ -255,11 +294,50 @@ function Sheet({
                 ? "تم تعبئة واجب اليوم. عدّل المدى حسب التسميع الفعلي."
                 : "حدد ما سمعه الطالب في هذه المرة."}
             </p>
-            <RangeFields
-              title="مدى التسميع"
-              value={range}
-              onChange={setRange}
-            />
+            <fieldset className="assessment-picker">
+              <legend>نتيجة {mode === "memory" ? "الحفظ" : "المراجعة"}</legend>
+              <div className="assessment-options">
+                {(["MASTERED", "NOT_MASTERED", "NOT_REQUIRED"] as const).map(
+                  (value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`assessment-choice ${value}`}
+                      aria-pressed={assessment === value}
+                      onClick={() => {
+                        setAssessment(value);
+                        setError("");
+                      }}
+                    >
+                      {assessmentLabels[value]}
+                    </button>
+                  ),
+                )}
+              </div>
+            </fieldset>
+            {assessment !== "NOT_REQUIRED" && (
+              <>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={recited}
+                    onChange={(e) => setRecited(e.target.checked)}
+                  />
+                  سمّع الطالب آيات اليوم
+                </label>
+                {recited ? (
+                  <RangeFields
+                    title="مدى التسميع"
+                    value={range}
+                    onChange={setRange}
+                  />
+                ) : (
+                  <p className="notice">
+                    تُحفظ النتيجة فقط، دون إضافة آيات أو صفحات لم يسمعها المعلم.
+                  </p>
+                )}
+              </>
+            )}
           </>
         )}
         {mode === "assignment" && (
@@ -331,7 +409,11 @@ function Sheet({
           </p>
         )}
         <button className="primary" disabled={busy} type="submit">
-          {busy ? "جارٍ الحفظ…" : "حفظ"}
+          {busy
+            ? "جارٍ الحفظ…"
+            : mode === "memory" || mode === "review"
+              ? "حفظ التسجيل"
+              : "حفظ"}
         </button>
       </form>
     </dialog>
@@ -624,28 +706,64 @@ export default function TeacherFlow() {
               <p className="subtle">{student.today.note}</p>
             )}
           </div>
-          <h2>تسجيل اليوم</h2>
+          <h2 className="section-heading">
+            <ClipboardList size={21} aria-hidden="true" />
+            تسجيل اليوم
+          </h2>
+          {student.outcome === "ABSENT" && (
+            <div className="absence-banner">
+              <UserRoundX aria-hidden="true" />
+              <div>
+                <strong>الطالب غائب اليوم</strong>
+                <p>
+                  يمكنك تحديد واجب الغد أو نقل واجب اليوم، وإلغاء الغياب إذا
+                  حضر.
+                </p>
+              </div>
+            </div>
+          )}
+          {student.outcome === "ABSENT" &&
+            student.today &&
+            !student.tomorrow && (
+              <button
+                className="secondary"
+                disabled={busy || !!day.closedAt}
+                onClick={() =>
+                  save({
+                    action: "status",
+                    enrollmentId: student.enrollmentId,
+                    outcome: "ABSENT",
+                    note: student.note,
+                    carry: true,
+                  })
+                }
+              >
+                نقل واجب اليوم للغد
+              </button>
+            )}
           <div className="actions">
             <button
               className="action memory"
+              hidden={student.outcome === "ABSENT"}
               disabled={busy || !!day.closedAt || student.outcome === "ABSENT"}
               onClick={() => setMode("memory")}
             >
-              + حفظ جديد
+              <BookOpen size={21} aria-hidden="true" /> + حفظ جديد
             </button>
             <button
               className="action"
+              hidden={student.outcome === "ABSENT"}
               disabled={busy || !!day.closedAt || student.outcome === "ABSENT"}
               onClick={() => setMode("review")}
             >
-              + مراجعة
+              <RotateCcw size={21} aria-hidden="true" /> + مراجعة
             </button>
             <button
               className="action assignment"
               disabled={busy || !!day.closedAt}
               onClick={() => setMode("assignment")}
             >
-              + واجب الغد
+              <CalendarDays size={21} aria-hidden="true" /> + واجب الغد
             </button>
           </div>
           <button
@@ -667,62 +785,89 @@ export default function TeacherFlow() {
               ? "حضر الطالب — إلغاء الغياب"
               : "غائب اليوم"}
           </button>
-          <section className="entries">
-            <h3>سجل التسميع اليوم</h3>
-            <div className="stack">
-              {student.entries.map((e) => (
-                <article key={e.id} className="entry">
-                  <div className="entry-top">
-                    <span
-                      className={`badge ${e.kind === "MEMORIZATION" ? "memory" : ""}`}
+          {student.outcome !== "ABSENT" && (
+            <section className="entries">
+              <h3>سجل التسميع اليوم</h3>
+              <div className="stack">
+                {student.entries.map((e) => (
+                  <article key={e.id} className="entry">
+                    <div className="entry-top">
+                      <span
+                        className={`badge ${e.kind === "MEMORIZATION" ? "memory" : ""}`}
+                      >
+                        {e.kind === "MEMORIZATION" ? "حفظ جديد" : "مراجعة"}
+                      </span>
+                      <p className="range">{rangeText(e)}</p>
+                    </div>
+                    <p className="subtle">
+                      {new Intl.DateTimeFormat("ar", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: day.timezone,
+                      }).format(new Date(e.createdAt))}{" "}
+                      · {formatPages(entryPages(e))} صفحة · {ayahAmount(e)} آية
+                      {e.assessment && (
+                        <span className={`entry-assessment ${e.assessment}`}>
+                          {assessmentLabels[e.assessment as Assessment]}
+                        </span>
+                      )}
+                    </p>
+                  </article>
+                ))}
+                {!student.entries.length && (
+                  <p className="subtle card">لم يسجل تسميع بعد.</p>
+                )}
+              </div>
+            </section>
+          )}
+          {student.outcome !== "ABSENT" && (
+            <section className="assessment-summary">
+              <h3>
+                <CheckCheck size={18} aria-hidden="true" />
+                نتائج اليوم
+              </h3>
+              <div className="assessment-summary-grid">
+                {(["MEMORIZATION", "REVIEW"] as const).map((kind) => {
+                  const value =
+                    kind === "MEMORIZATION"
+                      ? student.memorizationResult
+                      : student.reviewResult;
+                  return (
+                    <button
+                      key={kind}
+                      className={`assessment-tile ${value || "pending"}`}
+                      disabled={busy || !!day.closedAt}
+                      onClick={() =>
+                        setMode(kind === "MEMORIZATION" ? "memory" : "review")
+                      }
                     >
-                      {e.kind === "MEMORIZATION" ? "حفظ جديد" : "مراجعة"}
-                    </span>
-                    <p className="range">{rangeText(e)}</p>
-                  </div>
+                      <span>
+                        {kind === "MEMORIZATION" ? "الحفظ الجديد" : "المراجعة"}
+                      </span>
+                      <strong>
+                        {value
+                          ? assessmentLabels[value as Assessment]
+                          : "لم تُحدد بعد"}
+                      </strong>
+                      <small>
+                        {value
+                          ? "تحديث النتيجة أو إضافة تسميع"
+                          : "حددها أثناء التسجيل"}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+              {!student.memorizationResult &&
+                !student.reviewResult &&
+                student.outcome && (
                   <p className="subtle">
-                    {new Intl.DateTimeFormat("ar", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      timeZone: day.timezone,
-                    }).format(new Date(e.createdAt))}{" "}
-                    · {formatPages(entryPages(e))} صفحة · {ayahAmount(e)} آية
+                    نتيجة سابقة: {labels[student.outcome]}. لم تُسجل نتائج
+                    منفصلة آنذاك.
                   </p>
-                </article>
-              ))}
-              {!student.entries.length && (
-                <p className="subtle card">لم يسجل تسميع بعد.</p>
-              )}
-            </div>
-          </section>
-          <section className="card result">
-            <p>النتيجة اليومية</p>
-            <div className="result-options">
-              {(["MEMORIZED", "NOT_MEMORIZED", "ABSENT"] as const).map(
-                (outcome) => (
-                  <button
-                    key={outcome}
-                    className={`badge ${outcome}`}
-                    aria-pressed={student.outcome === outcome}
-                    disabled={busy || !!day.closedAt}
-                    onClick={() =>
-                      outcome === "ABSENT"
-                        ? setMode("absent")
-                        : save({
-                            action: "status",
-                            enrollmentId: student.enrollmentId,
-                            outcome,
-                            note: student.note,
-                            carry: false,
-                          })
-                    }
-                  >
-                    {labels[outcome]}
-                  </button>
-                ),
-              )}
-            </div>
-          </section>
+                )}
+            </section>
+          )}
           <button
             className="text-button small-space"
             disabled={busy || !!day.closedAt}
@@ -760,7 +905,7 @@ export default function TeacherFlow() {
             </a>
           ) : (
             <p className="subtle report-link">
-              حدد النتيجة اليومية لتفعيل تقرير الطالب.
+              أكمل نتيجتي الحفظ والمراجعة لتفعيل تقرير الطالب.
             </p>
           )}
           {mode && (
@@ -794,7 +939,13 @@ export default function TeacherFlow() {
                 <strong>
                   {day.students.filter((s) => s.outcome === o).length}
                 </strong>
-                <span>{labels[o]}</span>
+                <span>
+                  {o === "MEMORIZED"
+                    ? "أكمل المطلوب"
+                    : o === "NOT_MEMORIZED"
+                      ? "يحتاج تثبيتًا"
+                      : "غائب"}
+                </span>
               </div>
             ))}
           </div>
@@ -911,7 +1062,15 @@ export default function TeacherFlow() {
                       : "لا يوجد تسميع اليوم"}
                   </span>
                 </span>
-                <Badge outcome={s.outcome} />
+                <span className="student-result-label">
+                  {s.outcome === "ABSENT" ? (
+                    "غائب"
+                  ) : s.memorizationResult || s.reviewResult ? (
+                    `حفظ: ${s.memorizationResult ? assessmentLabels[s.memorizationResult as Assessment] : "بانتظار التسجيل"} · مراجعة: ${s.reviewResult ? assessmentLabels[s.reviewResult as Assessment] : "بانتظار التسجيل"}`
+                  ) : (
+                    <Badge outcome={s.outcome} />
+                  )}
+                </span>
                 <span className="chevron">‹</span>
               </button>
             ))}
