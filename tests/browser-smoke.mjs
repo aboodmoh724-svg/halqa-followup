@@ -233,6 +233,13 @@ try {
     assert.equal(backward.students[0].entries[2].direction, "REVERSE");
     assert.equal(backward.students[0].entries.length, 3);
     assert.ok(backward.students[0].entries[2].pageAmount > 0);
+    const reversePdf = await context.request.get(
+      `${url}/report?date=${day.date}&student=${day.students[0].enrollmentId}`,
+      { timeout: 90000 },
+    );
+    assert.equal(reversePdf.status(), 200);
+    await writeFile("work/smoke/reverse-student.pdf", await reversePdf.body());
+
     await page
       .getByRole("button", { name: "تعديل التسميع", exact: true })
       .last()
