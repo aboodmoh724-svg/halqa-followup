@@ -23,7 +23,7 @@ export const madaniPageMap: MadaniPageMap = {
 export const roundPages = (amount: number) =>
   Math.round(amount * 10000) / 10000;
 export const formatPages = (amount: number) =>
-  new Intl.NumberFormat("ar", { maximumFractionDigits: 4 }).format(amount);
+  new Intl.NumberFormat("ar", { maximumFractionDigits: 2 }).format(amount);
 
 export type PageEntry = QuranRange & {
   pageAmount?: number | null;
