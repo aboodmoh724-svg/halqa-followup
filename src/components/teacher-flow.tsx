@@ -167,7 +167,7 @@ function Sheet({
   const [note, setNote] = useState(
     mode === "assignment" ? (student.tomorrow?.note ?? "") : student.note,
   );
-  const [imageName, setImageName] = useState(student.tomorrow?.imageName ?? "");
+  const imageName = student.tomorrow?.imageName ?? "";
   const [carry, setCarry] = useState(true);
   const [error, setError] = useState("");
   const requestKey = useRef<string>("");
@@ -294,15 +294,6 @@ function Sheet({
                 onChange={setReview}
               />
             )}
-            <label>
-              اسم الصورة (نص فقط)
-              <input
-                maxLength={100}
-                value={imageName}
-                onChange={(e) => setImageName(e.target.value)}
-                placeholder="مثل: 17"
-              />
-            </label>
           </>
         )}
         {mode === "absent" && (
@@ -632,9 +623,6 @@ export default function TeacherFlow() {
             {student.today?.note && (
               <p className="subtle">{student.today.note}</p>
             )}
-            {student.today?.imageName && (
-              <p className="subtle">الصورة: {student.today.imageName}</p>
-            )}
           </div>
           <h2>تسجيل اليوم</h2>
           <div className="actions">
@@ -750,9 +738,6 @@ export default function TeacherFlow() {
               <p>المراجعة: {rangeDescription(student.tomorrow.review)}</p>
               {student.tomorrow.note && (
                 <p className="subtle">{student.tomorrow.note}</p>
-              )}
-              {student.tomorrow.imageName && (
-                <p className="subtle">الصورة: {student.tomorrow.imageName}</p>
               )}
             </section>
           )}
