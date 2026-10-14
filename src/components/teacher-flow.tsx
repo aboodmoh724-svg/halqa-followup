@@ -30,7 +30,14 @@ import {
   type StudentView,
 } from "@/lib/types";
 type Teacher = { name: string; halqas: { id: string; name: string }[] };
-type Mode = "memory" | "review" | "assignment" | "absent" | "note";
+type Mode =
+  | "memory"
+  | "review"
+  | "memory-result"
+  | "review-result"
+  | "assignment"
+  | "absent"
+  | "note";
 function studentSearchKey(text: string) {
   return text
     .normalize("NFKC")
@@ -152,7 +159,7 @@ function Sheet({
   mode: Mode;
   student: StudentView;
   busy: boolean;
-  onClose: () => void;
+  onClose: (next?: Mode) => void;
   onSave: (data: Record<string, unknown>) => Promise<boolean>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -178,9 +185,17 @@ function Sheet({
     mode === "assignment" ? (student.tomorrow?.note ?? "") : student.note,
   );
   const imageName = student.tomorrow?.imageName ?? "";
-  const [assessment, setAssessment] = useState<Assessment | "">("");
+  const resultOnly = mode === "memory-result" || mode === "review-result";
+  const isReview = mode === "review" || mode === "review-result";
+  const [assessment, setAssessment] = useState<Assessment | "">(
+    resultOnly
+      ? (((isReview
+          ? student.reviewResult
+          : student.memorizationResult) as Assessment) ?? "")
+      : "",
+  );
   const [recited, setRecited] = useState(true);
-  const [carry, setCarry] = useState(true);
+
   const [error, setError] = useState("");
   const requestKey = useRef<string>("");
   useEffect(() => {
@@ -190,6 +205,8 @@ function Sheet({
   const titles = {
     memory: "إضافة حفظ جديد",
     review: "إضافة مراجعة",
+    "memory-result": "تعديل نتيجة الحفظ",
+    "review-result": "تعديل نتيجة المراجعة",
     assignment: "واجب الغد",
     absent: "تسجيل الغياب",
     note: "ملاحظة اليوم",
@@ -198,7 +215,7 @@ function Sheet({
     e.preventDefault();
     setError("");
     let data: Record<string, unknown>;
-    if (mode === "memory" || mode === "review") {
+    if (mode === "memory" || mode === "review" || resultOnly) {
       if (!assessment) {
         setError("اختر نتيجة التسميع أولًا");
         return;
@@ -207,17 +224,17 @@ function Sheet({
         !recited &&
         assessment === "MASTERED" &&
         !student.entries.some(
-          (e) => e.kind === (mode === "memory" ? "MEMORIZATION" : "REVIEW"),
+          (e) => e.kind === (isReview ? "REVIEW" : "MEMORIZATION"),
         )
       ) {
-        setError("لتسجيل الإتقان، أدخل الآيات التي سمعها الطالب");
+        setError("لتسجيل حافظ، أدخل الآيات التي سمعها الطالب");
         return;
       }
-      if (!recited || assessment === "NOT_REQUIRED") {
+      if (resultOnly || !recited || assessment === "NOT_REQUIRED") {
         if (
           await onSave({
             action: "assessment",
-            kind: mode === "memory" ? "MEMORIZATION" : "REVIEW",
+            kind: isReview ? "REVIEW" : "MEMORIZATION",
             assessment,
             enrollmentId: student.enrollmentId,
           })
@@ -233,7 +250,7 @@ function Sheet({
       data = {
         action: "entry",
         assessment,
-        kind: mode === "memory" ? "MEMORIZATION" : "REVIEW",
+        kind: isReview ? "REVIEW" : "MEMORIZATION",
         range: result.data,
         requestKey: requestKey.current,
       };
@@ -261,10 +278,19 @@ function Sheet({
         action: "status",
         outcome: mode === "absent" ? "ABSENT" : student.outcome,
         note,
-        carry: mode === "absent" && carry,
+        carry: mode === "absent",
       };
-    if (await onSave({ ...data, enrollmentId: student.enrollmentId }))
-      onClose();
+    if (await onSave({ ...data, enrollmentId: student.enrollmentId })) {
+      const hasToday = !!(student.today?.memorization || student.today?.review);
+      const hasTomorrow = !!(
+        student.tomorrow?.memorization || student.tomorrow?.review
+      );
+      onClose(
+        mode === "absent" && !hasToday && !hasTomorrow
+          ? "assignment"
+          : undefined,
+      );
+    }
   }
   return (
     <dialog
@@ -281,21 +307,23 @@ function Sheet({
           <button
             type="button"
             disabled={busy}
-            onClick={onClose}
+            onClick={() => onClose()}
             aria-label="إغلاق"
           >
             ×
           </button>
         </div>
-        {(mode === "memory" || mode === "review") && (
+        {(mode === "memory" || mode === "review" || resultOnly) && (
           <>
             <p className="notice">
-              {student.today?.[mode === "review" ? "review" : "memorization"]
-                ? "تم تعبئة واجب اليوم. عدّل المدى حسب التسميع الفعلي."
-                : "حدد ما سمعه الطالب في هذه المرة."}
+              {resultOnly
+                ? "تعديل النتيجة فقط؛ لن يضاف تسميع جديد أو صفحات أخرى."
+                : student.today?.[mode === "review" ? "review" : "memorization"]
+                  ? "تم تعبئة واجب اليوم. عدّل المدى حسب التسميع الفعلي."
+                  : "حدد ما سمعه الطالب في هذه المرة."}
             </p>
             <fieldset className="assessment-picker">
-              <legend>نتيجة {mode === "memory" ? "الحفظ" : "المراجعة"}</legend>
+              <legend>نتيجة {isReview ? "المراجعة" : "الحفظ"}</legend>
               <div className="assessment-options">
                 {(["MASTERED", "NOT_MASTERED", "NOT_REQUIRED"] as const).map(
                   (value) => (
@@ -315,7 +343,7 @@ function Sheet({
                 )}
               </div>
             </fieldset>
-            {assessment !== "NOT_REQUIRED" && (
+            {!resultOnly && assessment !== "NOT_REQUIRED" && (
               <>
                 <label className="check">
                   <input
@@ -342,6 +370,26 @@ function Sheet({
         )}
         {mode === "assignment" && (
           <>
+            {student.tomorrow?.autoMemorizationStatusId && (
+              <p className="notice">
+                الطالب غير حافظ الدرس الجديد:{" "}
+                {rangeText(student.tomorrow.memorization)}. تم إضافته تلقائيًا
+                إلى واجب الغد؛ يمكنك تعديله.
+              </p>
+            )}
+            {student.memorizationResult === "NOT_MASTERED" &&
+              student.tomorrow?.memorizationManual && (
+                <p className="notice">
+                  الطالب غير حافظ الدرس الجديد. أبقينا واجب الغد الذي حددته
+                  يدويًا؛ يمكنك تغييره هنا.
+                </p>
+              )}
+            {student.outcome === "ABSENT" &&
+              !(student.tomorrow?.memorization || student.tomorrow?.review) && (
+                <p className="notice">
+                  الطالب غائب ولا يوجد واجب سابق؛ حدد واجب الغد الآن.
+                </p>
+              )}
             <label className="check">
               <input
                 type="checkbox"
@@ -377,14 +425,13 @@ function Sheet({
         {mode === "absent" && (
           <>
             <p className="notice">يمكنك إلغاء الغياب إذا حضر الطالب لاحقًا.</p>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={carry}
-                onChange={(e) => setCarry(e.target.checked)}
-              />
-              نقل واجب اليوم للغد
-            </label>
+            <p className="notice">
+              {student.today?.memorization || student.today?.review
+                ? "سيُنقل واجب اليوم للغد تلقائيًا، مع إبقاء أي واجب سبق تحديده للغد."
+                : student.tomorrow?.memorization || student.tomorrow?.review
+                  ? "لا يوجد واجب اليوم؛ واجب الغد الذي حددته سيبقى محفوظًا."
+                  : "لا يوجد واجب اليوم. بعد تسجيل الغياب ستفتح نافذة واجب الغد لتحديده."}
+            </p>
             {student.tomorrow && (
               <p className="subtle">
                 يوجد واجب للغد؛ سيبقى محفوظًا دون استبداله.
@@ -411,8 +458,10 @@ function Sheet({
         <button className="primary" disabled={busy} type="submit">
           {busy
             ? "جارٍ الحفظ…"
-            : mode === "memory" || mode === "review"
-              ? "حفظ التسجيل"
+            : mode === "memory" || mode === "review" || resultOnly
+              ? resultOnly
+                ? "حفظ النتيجة"
+                : "حفظ التسجيل"
               : "حفظ"}
         </button>
       </form>
@@ -530,13 +579,21 @@ export default function TeacherFlow() {
     if (!day) return false;
     setBusy(true);
     try {
-      setDay(
-        await api<DayView>(`/api/halqas/${day.halqaId}`, {
-          ...data,
-          date: day.date,
-        }),
+      const updated = await api<DayView>(`/api/halqas/${day.halqaId}`, {
+        ...data,
+        date: day.date,
+      });
+      setDay(updated);
+      const saved = updated.students.find(
+        (s) => s.enrollmentId === data.enrollmentId,
       );
-      notify("تم الحفظ");
+      notify(
+        data.kind === "MEMORIZATION" &&
+          data.assessment === "NOT_MASTERED" &&
+          saved?.tomorrow?.autoMemorizationStatusId
+          ? "تم الحفظ وإضافة الدرس غير المحفوظ إلى واجب الغد"
+          : "تم الحفظ",
+      );
       return true;
     } catch (e) {
       notify((e as Error).message, true);
@@ -838,7 +895,15 @@ export default function TeacherFlow() {
                       className={`assessment-tile ${value || "pending"}`}
                       disabled={busy || !!day.closedAt}
                       onClick={() =>
-                        setMode(kind === "MEMORIZATION" ? "memory" : "review")
+                        setMode(
+                          value || student.entries.some((e) => e.kind === kind)
+                            ? kind === "MEMORIZATION"
+                              ? "memory-result"
+                              : "review-result"
+                            : kind === "MEMORIZATION"
+                              ? "memory"
+                              : "review",
+                        )
                       }
                     >
                       <span>
@@ -851,7 +916,7 @@ export default function TeacherFlow() {
                       </strong>
                       <small>
                         {value
-                          ? "تحديث النتيجة أو إضافة تسميع"
+                          ? "تعديل النتيجة دون تسميع جديد"
                           : "حددها أثناء التسجيل"}
                       </small>
                     </button>
@@ -914,7 +979,7 @@ export default function TeacherFlow() {
               mode={mode}
               student={student}
               busy={busy}
-              onClose={() => setMode(null)}
+              onClose={(next) => setMode(next ?? null)}
               onSave={save}
               saveError={message?.error ? message.text : null}
             />
@@ -1081,7 +1146,11 @@ export default function TeacherFlow() {
             </p>
           )}
           <div className="home-footer">
-            <button className="primary" onClick={() => setView("summary")}>
+            <button
+              className="primary"
+              disabled={loading || busy}
+              onClick={() => setView("summary")}
+            >
               ملخص ونهاية الحلقة
             </button>
             {teacher.halqas.length > 1 && (

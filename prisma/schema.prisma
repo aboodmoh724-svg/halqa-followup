@@ -106,6 +106,8 @@ model RecitationEntry {
   @@index([dailyStatusId, createdAt])
 }
 model Assignment {
+  autoMemorizationStatusId String?
+  memorizationManual Boolean @default(false)
   id String @id @default(cuid())
   enrollmentId String
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id])

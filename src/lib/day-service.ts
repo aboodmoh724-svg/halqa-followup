@@ -65,6 +65,8 @@ function assignmentView(
         review: Prisma.JsonValue;
         note: string;
         imageName: string;
+        autoMemorizationStatusId: string | null;
+        memorizationManual: boolean;
       }
     | undefined,
 ): AssignmentView | null {
@@ -75,6 +77,8 @@ function assignmentView(
         review: a.review ? rangeSchema.parse(a.review) : null,
         note: a.note,
         imageName: a.imageName,
+        autoMemorizationStatusId: a.autoMemorizationStatusId,
+        memorizationManual: a.memorizationManual,
       }
     : null;
 }
@@ -174,7 +178,7 @@ export async function mutateDay(
     }
     const status = await tx.dailyStudentStatus.findFirst({
       where: { sessionId: session.id, enrollmentId: m.enrollmentId, halqaId },
-      include: { entries: true },
+      include: { entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
     });
     if (!status) throw new HttpError(404, "الطالب غير موجود في هذه الحلقة");
     if (m.action === "entry") {
@@ -214,7 +218,7 @@ export async function mutateDay(
       m.assessment === "MASTERED" &&
       !status.entries.some((e) => e.kind === m.kind)
     )
-      throw new HttpError(409, "سجل التسميع أولًا قبل الإتقان");
+      throw new HttpError(409, "سجل التسميع أولًا قبل اختيار حافظ");
     if (m.action === "assessment" || (m.action === "entry" && m.assessment)) {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل تسجيل النتيجة");
@@ -230,9 +234,75 @@ export async function mutateDay(
         },
       });
     }
+    if (
+      (m.action === "assessment" || m.action === "entry") &&
+      m.kind === "MEMORIZATION" &&
+      m.assessment
+    ) {
+      const where = {
+        enrollmentId_dueDate: {
+          enrollmentId: m.enrollmentId,
+          dueDate: dayDate(nextDay(m.date)),
+        },
+      };
+      const tomorrow = await tx.assignment.findUnique({ where });
+      if (m.assessment === "NOT_MASTERED") {
+        const today = await tx.assignment.findUnique({
+          where: {
+            enrollmentId_dueDate: {
+              enrollmentId: m.enrollmentId,
+              dueDate: dayDate(m.date),
+            },
+          },
+        });
+        const last = [...status.entries]
+          .reverse()
+          .find((e) => e.kind === "MEMORIZATION");
+        const candidate =
+          m.action === "entry"
+            ? m.range
+            : last
+              ? {
+                  startSurah: last.startSurah,
+                  startAyah: last.startAyah,
+                  endSurah: last.endSurah,
+                  endAyah: last.endAyah,
+                }
+              : today?.memorization;
+        const range = rangeSchema.safeParse(candidate);
+        if (range.success) {
+          await tx.assignment.upsert({
+            where,
+            create: {
+              enrollmentId: m.enrollmentId,
+              dueDate: dayDate(nextDay(m.date)),
+              memorization: range.data,
+              autoMemorizationStatusId: status.id,
+            },
+            update: {
+              memorization: range.data,
+              autoMemorizationStatusId: status.id,
+              memorizationManual: false,
+              carriedFromId: null,
+            },
+          });
+        }
+      } else if (
+        tomorrow?.autoMemorizationStatusId === status.id &&
+        !tomorrow.memorizationManual
+      ) {
+        await tx.assignment.update({
+          where,
+          data: { memorization: Prisma.DbNull, autoMemorizationStatusId: null },
+        });
+      }
+    }
     if (m.action === "status") {
       if (m.outcome === "ABSENT" && status.entries.length)
-        throw new HttpError(409, "يوجد تسميع اليوم؛ اختر حفظ أو لم يحفظ");
+        throw new HttpError(
+          409,
+          "يوجد تسميع اليوم؛ لا يمكن تسجيل الغياب بعد التسميع",
+        );
       await tx.dailyStudentStatus.update({
         where: { id: status.id },
         data: {
@@ -243,7 +313,7 @@ export async function mutateDay(
             : {}),
         },
       });
-      if (m.carry && m.outcome === "ABSENT") {
+      if (m.outcome === "ABSENT") {
         const today = await tx.assignment.findUnique({
           where: {
             enrollmentId_dueDate: {
@@ -252,7 +322,7 @@ export async function mutateDay(
             },
           },
         });
-        if (today)
+        if (today && (today.memorization || today.review))
           await tx.assignment.upsert({
             where: {
               enrollmentId_dueDate: {
@@ -280,6 +350,8 @@ export async function mutateDay(
         note: m.note.trim(),
         imageName: m.imageName.trim(),
         carriedFromId: null,
+        autoMemorizationStatusId: null,
+        memorizationManual: true,
       };
       await tx.assignment.upsert({
         where: {

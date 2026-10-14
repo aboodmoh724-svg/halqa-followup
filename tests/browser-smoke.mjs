@@ -69,21 +69,21 @@ try {
   await dialog.getByText("اختر نتيجة التسميع أولًا").waitFor();
   await page.screenshot({ path: "work/smoke/assessment-dialog.png" });
   await dialog.getByRole("spinbutton").nth(1).fill("17");
-  await dialog.getByRole("button", { name: "أتقن", exact: true }).click();
+  await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
   await dialog
     .getByRole("button", { name: "حفظ التسجيل", exact: true })
     .click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
   await dialog.getByRole("spinbutton").nth(0).fill("18");
-  await dialog.getByRole("button", { name: "أتقن", exact: true }).click();
+  await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
   await dialog
     .getByRole("button", { name: "حفظ التسجيل", exact: true })
     .click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
   assert.equal(await dialog.getByRole("combobox").nth(0).inputValue(), "68");
-  await dialog.getByRole("button", { name: "لم يتقن", exact: true }).click();
+  await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
   await dialog
     .getByRole("button", { name: "حفظ التسجيل", exact: true })
     .click();
@@ -124,6 +124,42 @@ try {
   assert.equal(day.students[0].reviewResult, "NOT_MASTERED");
   assert.equal(day.students[0].entries.length, 3);
   assert.equal(day.students[0].entries[2].assessment, "NOT_MASTERED");
+  await page.locator(".assessment-tile").first().click();
+  await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
+  await dialog
+    .getByRole("button", { name: "حفظ النتيجة", exact: true })
+    .click();
+  await dialog.waitFor({ state: "hidden" });
+  let corrected = await (await context.request.get(url)).json();
+  assert.equal(corrected.students[0].entries.length, 3);
+  assert.deepEqual(corrected.students[0].tomorrow.memorization, {
+    startSurah: 67,
+    startAyah: 18,
+    endSurah: 67,
+    endAyah: 20,
+  });
+  await page.getByRole("button", { name: "+ واجب الغد", exact: true }).click();
+  await dialog.getByText(/تم إضافته تلقائيًا/).waitFor();
+  await page.screenshot({ path: "work/smoke/automatic-assignment.png" });
+  await dialog
+    .getByRole("group", { name: "مدى الحفظ" })
+    .getByRole("spinbutton")
+    .nth(1)
+    .fill("24");
+  await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.locator(".assessment-tile").first().click();
+  await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
+  await page.screenshot({ path: "work/smoke/correct-result.png" });
+  await dialog
+    .getByRole("button", { name: "حفظ النتيجة", exact: true })
+    .click();
+  await dialog.waitFor({ state: "hidden" });
+  corrected = await (await context.request.get(url)).json();
+  assert.equal(corrected.students[0].entries.length, 3);
+  assert.equal(corrected.students[0].memorizationResult, "MASTERED");
+  assert.equal(corrected.students[0].tomorrow.memorization.endAyah, 24);
+  assert.equal(corrected.students[0].tomorrow.autoMemorizationStatusId, null);
   const post = (data) =>
     context.request.post(url, {
       data: { ...data, date: day.date },
@@ -185,7 +221,7 @@ try {
     .click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
-  await dialog.getByRole("button", { name: "لم يتقن", exact: true }).click();
+  await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
   await dialog.getByLabel("سمّع الطالب آيات اليوم").uncheck();
   await dialog
     .getByRole("button", { name: "حفظ التسجيل", exact: true })
@@ -199,6 +235,35 @@ try {
     path: "work/smoke/no-recitation-result.png",
     fullPage: true,
   });
+  // Fixture setup is guarded by the isolated TEST database check above.
+  const { PrismaClient } = await import("@prisma/client");
+  const fixtureDb = new PrismaClient();
+  const lastStudent = day.students.at(-1);
+  try {
+    await fixtureDb.assignment.deleteMany({
+      where: { enrollmentId: lastStudent.enrollmentId },
+    });
+  } finally {
+    await fixtureDb.$disconnect();
+  }
+  await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
+  await page.getByRole("button", { name: "تحديث اليوم", exact: true }).click();
+  await page
+    .getByRole("button", { name: new RegExp(lastStudent.name) })
+    .click();
+  await page
+    .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
+    .click();
+  await page.getByRole("button", { name: "غائب اليوم", exact: true }).click();
+  await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+  await page.getByRole("dialog", { name: "واجب الغد", exact: true }).waitFor();
+  await dialog.getByText(/الطالب غائب ولا يوجد واجب سابق/).waitFor();
+  await page.screenshot({ path: "work/smoke/absence-new-assignment.png" });
+  await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  const absentDay = await (await context.request.get(url)).json();
+  assert.ok(absentDay.students.at(-1).tomorrow.memorization);
+  assert.equal(absentDay.students.at(-1).outcome, "ABSENT");
   const all = await context.request.get(`${url}/report?date=${day.date}`, {
     timeout: 90000,
   });

@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { rangeSchema, type QuranRange } from "./quran";
 export const labels = {
-  MEMORIZED: "حفظ",
-  NOT_MEMORIZED: "لم يحفظ",
+  MEMORIZED: "حافظ",
+  NOT_MEMORIZED: "غير حافظ",
   ABSENT: "غائب",
 } as const;
 export type Outcome = keyof typeof labels;
 export const assessmentLabels = {
-  MASTERED: "أتقن",
-  NOT_MASTERED: "لم يتقن",
+  MASTERED: "حافظ",
+  NOT_MASTERED: "غير حافظ",
   NOT_REQUIRED: "غير مطلوب اليوم",
 } as const;
 export type Assessment = keyof typeof assessmentLabels;
@@ -22,6 +22,8 @@ export function independentSummary(
     : "MEMORIZED";
 }
 export type AssignmentView = {
+  autoMemorizationStatusId?: string | null;
+  memorizationManual?: boolean;
   id: string;
   memorization: QuranRange | null;
   review: QuranRange | null;
