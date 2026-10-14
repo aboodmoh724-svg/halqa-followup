@@ -1,3 +1,4 @@
+import { collectiveReportMarkup } from "./collective-report";
 import { readFile } from "node:fs/promises";
 import { academyName } from "./branding";
 import path from "node:path";
@@ -33,7 +34,9 @@ export function reportMarkup(
   day: DayView,
   students: StudentView[],
   fontCss: string,
+  collective = students.length > 1,
 ) {
+  if (collective) return collectiveReportMarkup(day, students, fontCss);
   const date = new Intl.DateTimeFormat("ar", {
     year: "numeric",
     month: "long",
@@ -57,7 +60,11 @@ export function reportMarkup(
     @page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;color:#17324d;font:16px/1.8 CairoArabic,CairoLatin,sans-serif}.page{position:relative;width:210mm;height:297mm;padding:17mm;background:#f6f5f1;break-after:page;overflow:hidden}.page:last-child{break-after:auto}.content{transform-origin:top right}header{border-bottom:2px solid #19786e;padding-bottom:18px;margin-bottom:24px}header p{color:#667085;margin:4px 0}.brand{font-size:20px;color:#19786e;font-weight:700}h1{font-size:30px;margin:0 0 12px}h2{font-size:18px;margin:0 0 10px}p{margin:6px 0}.status{border-radius:16px;padding:14px 20px;font-size:27px;font-weight:700;margin-bottom:24px;background:#f2f3f4;color:#667085}.MEMORIZED{background:#e9f4f1;color:#19786e}.NOT_MEMORIZED{background:#fbecec;color:#a03f3f}article{background:#fff;border-radius:16px;padding:18px 22px;margin-bottom:16px}.assignment{background:#fbf4e6}.assignment h2{color:#94621b}ul{padding:0;list-style:none;margin:0}li{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px solid #f1f1ee}li:last-child{border:0}li span,.muted{color:#667085;font-size:13px}.note{white-space:pre-wrap;overflow-wrap:anywhere}.report-title{font-weight:700;color:#17324d}.today{background:#f0f5f3}footer{position:absolute;bottom:12mm;left:17mm;right:17mm;border-top:1px solid #dce1df;padding-top:10px;color:#667085;font-size:12px;display:flex;justify-content:space-between;gap:12px}
   </style><body>${pages}</body></html>`;
 }
-export async function generateReport(day: DayView, students: StudentView[]) {
+export async function generateReport(
+  day: DayView,
+  students: StudentView[],
+  collective = students.length > 1,
+) {
   if (active >= 2)
     throw new HttpError(503, "توليد التقارير مشغول. حاول بعد قليل");
   if (!students.length) throw new HttpError(404, "لا يوجد طلاب للتقرير");
@@ -90,12 +97,30 @@ export async function generateReport(day: DayView, students: StudentView[]) {
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.route("**/*", (route) => route.abort());
-    await page.setContent(reportMarkup(day, students, fonts.join("\n")), {
-      waitUntil: "load",
-      timeout: 15000,
-    });
+    await page.setContent(
+      reportMarkup(day, students, fonts.join("\n"), collective),
+      {
+        waitUntil: "load",
+        timeout: 15000,
+      },
+    );
     await page.evaluate(async () => {
       await document.fonts.ready;
+      if (document.querySelector("table")) {
+        const content = document.querySelector<HTMLElement>(".content")!;
+        const footer = content.parentElement!.querySelector("footer")!;
+        const available =
+          footer.getBoundingClientRect().top -
+          content.getBoundingClientRect().top -
+          20;
+        for (let size = 13; size >= 10; size -= 0.25) {
+          document.documentElement.style.setProperty(
+            "--table-font-size",
+            `${size}px`,
+          );
+          if (content.scrollHeight <= available) break;
+        }
+      }
       document.querySelectorAll<HTMLElement>(".content").forEach((content) => {
         const parent = content.parentElement!;
         const footer = parent.querySelector("footer")!;

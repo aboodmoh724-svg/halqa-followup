@@ -1,0 +1,73 @@
+import { academyName } from "./branding";
+import { rangeText, rangeDescription, totalPages, formatPages } from "./quran";
+import {
+  assessmentLabels,
+  type Assessment,
+  type DayView,
+  type StudentView,
+} from "./types";
+const escape = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ]!,
+  );
+export function collectiveReportMarkup(
+  day: DayView,
+  students: StudentView[],
+  fontCss: string,
+) {
+  const date = new Intl.DateTimeFormat("ar", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${day.date}T00:00:00Z`));
+  const assignment = (a: StudentView["today"]) =>
+    `<div><b>حفظ:</b> ${escape(rangeDescription(a?.memorization))}</div><div><b>مراجعة:</b> ${escape(rangeDescription(a?.review))}</div>`;
+  const actual = (s: StudentView, kind: "MEMORIZATION" | "REVIEW") => {
+    const result =
+      kind === "MEMORIZATION" ? s.memorizationResult : s.reviewResult;
+    const absent = s.outcome === "ABSENT";
+    const label = absent
+      ? "غائب"
+      : result
+        ? assessmentLabels[result as Assessment]
+        : "لم تسجل النتيجة";
+    const style = absent
+      ? "absent"
+      : result === "MASTERED"
+        ? "mastered"
+        : result === "NOT_MASTERED"
+          ? "not-mastered"
+          : "pending";
+    const entries = s.entries.filter((e) => e.kind === kind);
+    const ranges = new Map<string, number>();
+    for (const e of entries) {
+      const text = rangeText(e);
+      ranges.set(text, (ranges.get(text) ?? 0) + 1);
+    }
+    return `<span class="result ${style}">${escape(label)}</span>${absent ? '<div class="muted">لم يحضر</div>' : Array.from(ranges, ([text, count]) => `<div>${escape(text)}${count > 1 ? ` <span class="muted">(${count} تسميعات)</span>` : ""}</div>`).join("") || '<div class="muted">لا يوجد تسميع</div>'}${!absent ? `<div class="amount">${formatPages(totalPages(entries))} صفحة</div>` : ""}`;
+  };
+  const rows = students
+    .map((s, i) => {
+      const notes = [
+        s.note,
+        s.today?.note ? `واجب اليوم: ${s.today.note}` : "",
+        s.tomorrow?.note ? `واجب الغد: ${s.tomorrow.note}` : "",
+      ].filter(Boolean);
+      return `<tr data-student="${escape(s.enrollmentId)}"><td class="student"><span class="number">${i + 1}</span>${escape(s.name)}</td><td>${assignment(s.today)}</td><td>${actual(s, "MEMORIZATION")}</td><td>${actual(s, "REVIEW")}</td><td class="homework">${assignment(s.tomorrow)}</td><td class="notes">${notes.length ? notes.map((n) => `<div>${escape(n!)}</div>`).join("") : "—"}</td></tr>`;
+    })
+    .join("");
+  const amount = (kind: "MEMORIZATION" | "REVIEW") =>
+    formatPages(
+      totalPages(
+        students.flatMap((s) => s.entries).filter((e) => e.kind === kind),
+      ),
+    );
+  return `<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><style>${fontCss}
+ @page{size:A3 portrait;margin:0}*{box-sizing:border-box}body{margin:0;color:#183b50;font:14px/1.65 CairoArabic,CairoLatin,sans-serif}.page{position:relative;width:297mm;height:420mm;padding:10mm;background:#fff;overflow:hidden}.content{transform-origin:top right}header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #19786e;padding-bottom:10px;margin-bottom:12px}.brand{font-size:23px;font-weight:700;color:#19786e}h1{font-size:23px;margin:2px 0 5px}p{margin:3px 0}.meta{color:#64748b;font-size:13px}.stats{display:flex;gap:12px;margin:10px 0 15px}.stat{flex:1;padding:8px 12px;border:1px solid #dce8e5;border-radius:9px;background:#f0f7f4}.stat b{font-size:18px;color:#19786e;margin-inline-start:8px}table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:var(--table-font-size,13px);line-height:1.5}th{background:#19786e;color:white;font-size:14px;font-weight:700;padding:10px 8px;text-align:right}th small{display:block;font-size:11px;font-weight:400;opacity:.95}td{padding:5px 7px;border:1px solid #dce5e3;vertical-align:middle;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f6f8f7}.student{font-weight:700;font-size:inherit}.number{display:inline-block;color:#19786e;font-size:12px;margin-inline-end:7px}.result{display:inline-block;padding:2px 9px;border-radius:6px;font-size:.95em;font-weight:700;margin-bottom:3px}.mastered{background:#dff3e7;color:#176241}.not-mastered{background:#fce3e3;color:#a12d35}.absent,.pending{background:#edf0f3;color:#596574}.amount{color:#19786e;font-size:.9em;font-weight:700;margin-top:2px}.muted{color:#76828f;font-size:.9em}.homework{background:#fbf6e9}.notes{white-space:pre-wrap;font-size:inherit;color:#465363}.notes div+div{margin-top:4px}footer{position:absolute;bottom:7mm;left:10mm;right:10mm;border-top:1px solid #dce5e3;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:#64748b}.legend{display:flex;gap:10px;align-items:center;margin:12px 0;font-size:12px;color:#64748b}.legend .result{margin:0}col.name{width:15%}col.today{width:16%}col.actual{width:18%}col.tomorrow{width:18%}col.note{width:15%}
+ </style><body><section class="page"><div class="content"><header><div><div class="brand">${escape(academyName)}</div><h1>التقرير اليومي لأولياء الأمور</h1><p class="meta">${escape(day.halqaName)} · ${escape(date)}</p></div><div class="meta">المعلم<br><strong>${escape(day.teacherName)}</strong></div></header><div class="stats"><div class="stat">الطلاب<b>${students.length}</b> · الغائبون ${students.filter((s) => s.outcome === "ABSENT").length}</div><div class="stat">مجموع الحفظ<b>${amount("MEMORIZATION")} صفحة</b></div><div class="stat">مجموع المراجعة<b>${amount("REVIEW")} صفحة</b></div></div><table><colgroup><col class="name"><col class="today"><col class="actual"><col class="actual"><col class="tomorrow"><col class="note"></colgroup><thead><tr><th>اسم الطالب</th><th>المطلوب اليوم</th><th>الحفظ الذي سمّعه<small>مدى التسميع والنتيجة النهائية</small></th><th>المراجعة التي سمّعها<small>مدى التسميع والنتيجة النهائية</small></th><th>واجب الغد</th><th>الملاحظات</th></tr></thead><tbody>${rows}</tbody></table><div class="legend"><span class="result mastered">حافظ</span><span class="result not-mastered">غير حافظ</span><span class="result absent">غائب</span><span>نتيجة الحفظ والمراجعة مستقلة؛ المعروض هو التقييم النهائي لليوم.</span></div></div><footer><span>أكاديمية ياسين · متابعة الحفظ والمراجعة</span><span>المقادير تقديرية وفق المصحف المدني 604 صفحات.</span><span>${escape(date)}</span></footer></section></body></html>`;
+}

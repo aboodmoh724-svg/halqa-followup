@@ -420,7 +420,13 @@ try {
       timeout: 90000,
     });
     assert.equal(all.status(), 200);
-    await writeFile("work/smoke/halqa.pdf", await all.body());
+    const collectivePdf = await all.body();
+    assert.equal(
+      (collectivePdf.toString("latin1").match(/\/Type\s*\/Page\b/g) || [])
+        .length,
+      1,
+    );
+    await writeFile("work/smoke/halqa.pdf", collectivePdf);
     await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
     await page.getByRole("button", { name: "تحديث اليوم" }).click();
     await page.getByRole("button", { name: "ملخص ونهاية الحلقة" }).click();

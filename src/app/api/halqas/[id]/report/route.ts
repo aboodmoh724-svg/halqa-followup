@@ -42,7 +42,7 @@ export async function GET(
     });
     if (bucket.attempts > 6)
       throw new HttpError(429, "انتظر دقيقة قبل توليد المزيد من التقارير");
-    const pdf = await generateReport(day, students);
+    const pdf = await generateReport(day, students, !student);
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
