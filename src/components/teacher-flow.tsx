@@ -97,6 +97,32 @@ function RangeFields({
   return (
     <fieldset className="range-fields">
       <legend>{title}</legend>
+      <fieldset className="assessment-picker">
+        <legend>اتجاه السور</legend>
+        <div className="assessment-options">
+          {(["FORWARD", "REVERSE"] as const).map((direction) => (
+            <button
+              type="button"
+              key={direction}
+              className="assessment-choice"
+              aria-pressed={(value.direction ?? "FORWARD") === direction}
+              onClick={() => {
+                const next = { ...value };
+                if (direction === "REVERSE") next.direction = direction;
+                else delete next.direction;
+                onChange(next);
+              }}
+            >
+              {direction === "FORWARD" ? "بترتيب المصحف" : "بعكس ترتيب السور"}
+            </button>
+          ))}
+        </div>
+        <p className="subtle">
+          {value.direction === "REVERSE"
+            ? "من الناس باتجاه البقرة؛ آيات كل سورة بترتيبها الطبيعي."
+            : "من البقرة باتجاه الناس."}
+        </p>
+      </fieldset>
       <div className="range-grid">
         {(["start", "end"] as const).map((side) => (
           <div className="contents" key={side}>
@@ -106,7 +132,10 @@ function RangeFields({
                 value={value[`${side}Surah`]}
                 onChange={(e) => surahChange(side, Number(e.target.value))}
               >
-                {surahs.map((s) => (
+                {(value.direction === "REVERSE"
+                  ? [...surahs].reverse()
+                  : surahs
+                ).map((s) => (
                   <option value={s.id} key={s.id}>
                     {s.name}
                   </option>
@@ -143,6 +172,12 @@ function RangeFields({
           </div>
         ))}
       </div>
+      {!rangeSchema.safeParse(value).success && (
+        <p className="notice" role="status">
+          اختر مدى صحيحًا وفق اتجاه السور، مع ترتيب الآيات داخل كل سورة من
+          الأصغر إلى الأكبر.
+        </p>
+      )}
       {rangeSchema.safeParse(value).success && (
         <p className="range-amount" aria-live="polite">
           المقدار: {amountText(value)}
@@ -1222,9 +1257,10 @@ export default function TeacherFlow() {
                 غير حافظ.
               </li>
               <li>
-                يمكنك إضافة تسميع آخر في اليوم نفسه. لتصحيح السورة والآيات، اضغط
-                «تعديل التسميع» تحت التسجيل. ولتصحيح النتيجة فقط، استخدم بطاقة
-                نتائج اليوم؛ لا تُضاف صفحات جديدة.
+                يمكنك إضافة تسميع آخر في اليوم نفسه. يمكن اختيار «بعكس ترتيب
+                السور» للقراءة من الناس باتجاه البقرة. لتصحيح السورة والآيات،
+                اضغط «تعديل التسميع» تحت التسجيل. ولتصحيح النتيجة فقط، استخدم
+                بطاقة نتائج اليوم؛ لا تُضاف صفحات جديدة.
               </li>
               <li>
                 إذا كان الطالب غير حافظ للدرس الجديد، يُضاف الدرس تلقائيًا إلى

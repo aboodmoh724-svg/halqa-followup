@@ -88,7 +88,12 @@ model DailyStudentStatus {
   @@unique([sessionId, enrollmentId])
   @@index([enrollmentId, halqaId])
 }
+enum RangeDirection {
+  FORWARD
+  REVERSE
+}
 model RecitationEntry {
+  direction RangeDirection @default(FORWARD)
   id String @id @default(cuid())
   dailyStatusId String
   dailyStatus DailyStudentStatus @relation(fields: [dailyStatusId], references: [id])

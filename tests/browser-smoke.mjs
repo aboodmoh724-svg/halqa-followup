@@ -192,9 +192,7 @@ try {
       "17",
     );
     await dialog.getByRole("spinbutton").nth(1).fill("16");
-    await dialog
-      .getByRole("button", { name: "حفظ", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     const edited = await (await context.request.get(url)).json();
     assert.equal(edited.students[0].entries.length, 3);
@@ -214,11 +212,39 @@ try {
       .click();
     await dialog.getByRole("spinbutton").nth(1).fill("17");
     await page.screenshot({ path: "work/smoke/edit-recitation.png" });
-    await dialog
-      .getByRole("button", { name: "حفظ", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
 
+    await page
+      .getByRole("button", { name: "تعديل التسميع", exact: true })
+      .last()
+      .click();
+    await dialog
+      .getByRole("button", { name: "بعكس ترتيب السور", exact: true })
+      .click();
+    await dialog.getByRole("combobox").nth(0).selectOption("92");
+    await dialog.getByRole("combobox").nth(1).selectOption("78");
+    await dialog.getByRole("spinbutton").nth(0).fill("1");
+    await dialog.getByRole("spinbutton").nth(1).fill("40");
+    await page.screenshot({ path: "work/smoke/reverse-range.png" });
+    await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    const backward = await (await context.request.get(url)).json();
+    assert.equal(backward.students[0].entries[2].direction, "REVERSE");
+    assert.equal(backward.students[0].entries.length, 3);
+    assert.ok(backward.students[0].entries[2].pageAmount > 0);
+    await page
+      .getByRole("button", { name: "تعديل التسميع", exact: true })
+      .last()
+      .click();
+    await dialog
+      .getByRole("button", { name: "بترتيب المصحف", exact: true })
+      .click();
+    await dialog.getByRole("combobox").nth(0).selectOption("68");
+    await dialog.getByRole("combobox").nth(1).selectOption("68");
+    await dialog.getByRole("spinbutton").nth(1).fill("25");
+    await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
     await page.locator(".assessment-tile").first().click();
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
     await dialog

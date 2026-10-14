@@ -130,6 +130,7 @@ export async function getDay(
         id: e.id,
         kind: e.kind,
         assessment: e.assessment,
+        ...(e.direction === "REVERSE" ? { direction: "REVERSE" as const } : {}),
         startSurah: e.startSurah,
         startAyah: e.startAyah,
         endSurah: e.endSurah,
@@ -229,6 +230,7 @@ export async function mutateDay(
         where: { id: entry.id },
         data: {
           ...m.range,
+          direction: m.range.direction ?? "FORWARD",
           pageAmount: pages.amount,
           pageMappingVersion: pages.version,
         },
@@ -262,6 +264,7 @@ export async function mutateDay(
         if (
           existing.dailyStatusId !== status.id ||
           existing.kind !== m.kind ||
+          existing.direction !== (m.range.direction ?? "FORWARD") ||
           existing.assessment !== (m.assessment ?? null) ||
           existing.startSurah !== m.range.startSurah ||
           existing.startAyah !== m.range.startAyah ||
@@ -278,6 +281,7 @@ export async function mutateDay(
           kind: m.kind,
           assessment: m.assessment,
           ...m.range,
+          direction: m.range.direction ?? "FORWARD",
           requestKey: m.requestKey,
           pageAmount: pages.amount,
           pageMappingVersion: pages.version,
@@ -333,6 +337,9 @@ export async function mutateDay(
             ? m.range
             : last
               ? {
+                  ...(last.direction === "REVERSE"
+                    ? { direction: "REVERSE" as const }
+                    : {}),
                   startSurah: last.startSurah,
                   startAyah: last.startAyah,
                   endSurah: last.endSurah,
