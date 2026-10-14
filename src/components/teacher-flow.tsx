@@ -481,57 +481,64 @@ export default function TeacherFlow() {
     );
   if (!teacher)
     return (
-      <main className="shell login">
-        <div className="mark" aria-hidden="true">
-          ۞
+      <main className="shell login login-welcome">
+        <div className="login-intro">
+          <div className="mark" aria-hidden="true">
+            ۞
+          </div>
+          <div>
+            <p className="login-eyebrow">متابعة حلقات القرآن الكريم</p>
+            <h1>{academyName}</h1>
+            <p className="muted small-space">كل يوم، خطوة جديدة مع طلابك.</p>
+          </div>
         </div>
-        <div>
-          <h1>{academyName}</h1>
-          <p className="muted small-space">
-            حيّاك الله، أدخل رمزك لبدء متابعة طلابك.
-          </p>
-        </div>
-        <form className="stack" onSubmit={login}>
-          <label htmlFor="code">رمز المعلم</label>
-          <input
-            id="code"
-            className="code"
-            autoComplete="off"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            minLength={6}
-            maxLength={6}
-            required
-            dir="ltr"
-            value={code}
-            onChange={(e) =>
-              setCode(
-                e.target.value
-                  .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
-                  .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
-                  .replace(/\D/g, ""),
-              )
-            }
-          />
-          <label className="check">
+        <div className="login-panel">
+          <h2>أهلًا بك، معلمنا</h2>
+          <p className="login-help">أدخل رمزك الخاص لفتح حلقتك.</p>
+          <form className="stack" onSubmit={login}>
+            <label htmlFor="code">رمز المعلم</label>
             <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
+              id="code"
+              className="code"
+              autoComplete="off"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              minLength={6}
+              maxLength={6}
+              required
+              dir="ltr"
+              placeholder="— — — — — —"
+              value={code}
+              onChange={(e) =>
+                setCode(
+                  e.target.value
+                    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
+                    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
+                    .replace(/\D/g, ""),
+                )
+              }
             />
-            تذكرني على هذا الجهاز
-          </label>
-          {loginError && (
-            <p className="notice error" role="alert">
-              {loginError}
-            </p>
-          )}
-          <button className="primary" disabled={busy}>
-            {busy ? "جارٍ الدخول…" : "الدخول إلى الحلقة"}
-          </button>
-        </form>
-        <p className="subtle">رمزك خاص بك. لا تشاركه مع الآخرين.</p>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              تذكرني على هذا الجهاز
+            </label>
+            {loginError && (
+              <p className="notice error" role="alert">
+                {loginError}
+              </p>
+            )}
+            <button className="primary" disabled={busy}>
+              {busy ? "جارٍ الدخول…" : "الدخول إلى الحلقة"}
+            </button>
+          </form>
+          <p className="subtle">رمزك خاص بك. لا تشاركه مع الآخرين.</p>
+        </div>
+        <p className="login-footer">حفظٌ متقن · متابعةٌ أيسر</p>
       </main>
     );
   if (!day)
