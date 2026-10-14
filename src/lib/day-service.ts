@@ -5,6 +5,7 @@ import { dayDate, dayKey, nextDay } from "./dates";
 import {
   mutationSchema,
   independentSummary,
+  reportIssues,
   type DayView,
   type AssignmentView,
 } from "./types";
@@ -165,11 +166,41 @@ export async function mutateDay(
     });
     if (current.closedAt) throw new HttpError(409, "تم إنهاء يوم الحلقة");
     if (m.action === "close") {
-      const pending = await tx.dailyStudentStatus.count({
-        where: { sessionId: session.id, outcome: null },
+      const students = await tx.dailyStudentStatus.findMany({
+        where: { sessionId: session.id },
+        include: {
+          entries: true,
+          enrollment: {
+            include: {
+              student: true,
+              assignments: { where: { dueDate: dayDate(nextDay(m.date)) } },
+            },
+          },
+        },
       });
-      if (pending)
-        throw new HttpError(409, `بقي ${pending} طالب بدون نتيجة نهائية`);
+      const pending = students.filter(
+        (s) =>
+          reportIssues({
+            enrollmentId: s.enrollmentId,
+            name: s.enrollment.student.name,
+            outcome: s.outcome,
+            memorizationResult: s.memorizationResult,
+            reviewResult: s.reviewResult,
+            note: s.note,
+            entries: s.entries.map((e) => ({
+              ...e,
+              createdAt: e.createdAt.toISOString(),
+              pageAmount: e.pageAmount === null ? null : Number(e.pageAmount),
+            })),
+            today: null,
+            tomorrow: assignmentView(s.enrollment.assignments[0]),
+          }).length,
+      );
+      if (pending.length)
+        throw new HttpError(
+          409,
+          `بقي ${pending.length} تقرير غير مكتمل: أكمل نتيجتي الحفظ والمراجعة ومدى التسميع وواجب الغد`,
+        );
       await tx.dailySession.update({
         where: { id: session.id },
         data: { closedAt: new Date() },

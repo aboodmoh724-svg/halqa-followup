@@ -58,6 +58,24 @@ try {
     ),
     true,
   );
+  await page
+    .getByRole("button", { name: "التقرير اليومي لأولياء الأمور" })
+    .click();
+  assert.equal(
+    await page
+      .getByRole("button", {
+        name: "تصدير التقرير اليومي لأولياء الأمور (PDF)",
+        exact: true,
+      })
+      .isEnabled(),
+    false,
+  );
+  await page.getByText("التقارير المكتملة: 0 من 6").waitFor();
+  await page.screenshot({
+    path: "work/smoke/report-incomplete.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
   await page.getByRole("button", { name: /محمد أحمد علي/ }).click();
   await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -160,6 +178,18 @@ try {
   assert.equal(corrected.students[0].memorizationResult, "MASTERED");
   assert.equal(corrected.students[0].tomorrow.memorization.endAyah, 24);
   assert.equal(corrected.students[0].tomorrow.autoMemorizationStatusId, null);
+  assert.equal(
+    (await context.request.get(`${url}/report?date=${day.date}`)).status(),
+    409,
+  );
+  assert.equal(
+    (
+      await context.request.get(
+        `${url}/report?date=${day.date}&student=${day.students.at(-1).enrollmentId}`,
+      )
+    ).status(),
+    409,
+  );
   const post = (data) =>
     context.request.post(url, {
       data: { ...data, date: day.date },
@@ -277,6 +307,20 @@ try {
   await page.getByRole("button", { name: "تحديث اليوم" }).click();
   await page.getByRole("button", { name: "ملخص ونهاية الحلقة" }).click();
   await page.getByRole("button", { name: "إنهاء يوم الحلقة" }).waitFor();
+  assert.equal(
+    await page
+      .getByRole("link", {
+        name: "تصدير التقرير اليومي لأولياء الأمور (PDF)",
+        exact: true,
+      })
+      .isVisible(),
+    true,
+  );
+  await page.getByText("التقارير المكتملة: 6 من 6").waitFor();
+  await page.screenshot({
+    path: "work/smoke/report-ready.png",
+    fullPage: true,
+  });
   await page.screenshot({ path: "work/smoke/summary.png", fullPage: true });
   assert.equal((await post({ action: "close" })).status(), 200);
   assert.equal(

@@ -94,3 +94,36 @@ export const mutationSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("close"), date: z.string() }),
 ]);
+
+export function reportIssues(
+  student: StudentView,
+  legacyClosed = false,
+): string[] {
+  if (
+    legacyClosed &&
+    student.outcome &&
+    !student.memorizationResult &&
+    !student.reviewResult
+  )
+    return [];
+  const issues: string[] = [];
+  if (student.outcome !== "ABSENT") {
+    if (
+      !student.memorizationResult ||
+      !["MASTERED", "NOT_MASTERED"].includes(student.memorizationResult)
+    )
+      issues.push("نتيجة الحفظ الجديد");
+    if (
+      !student.reviewResult ||
+      !["MASTERED", "NOT_MASTERED"].includes(student.reviewResult)
+    )
+      issues.push("نتيجة المراجعة");
+    if (!student.entries.some((e) => e.kind === "MEMORIZATION"))
+      issues.push("مدى الحفظ الجديد");
+    if (!student.entries.some((e) => e.kind === "REVIEW"))
+      issues.push("مدى المراجعة");
+  }
+  if (!student.tomorrow?.memorization && !student.tomorrow?.review)
+    issues.push("واجب الغد");
+  return issues;
+}

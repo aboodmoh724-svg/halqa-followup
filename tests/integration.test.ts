@@ -59,7 +59,7 @@ test(
       );
       await assert.rejects(
         () => mutateDay(teacher.id, halqa.id, { action: "close", date: today }),
-        /بدون نتيجة/,
+        /غير مكتمل/,
       );
       await mutateDay(teacher.id, halqa.id, {
         action: "status",
@@ -227,7 +227,7 @@ test(
       assert.equal(day.students[0].outcome, null);
       await assert.rejects(
         () => mutateDay(teacher.id, halqa.id, { action: "close", date: today }),
-        /بدون نتيجة/,
+        /غير مكتمل/,
       );
       await mutateDay(teacher.id, halqa.id, {
         action: "entry",

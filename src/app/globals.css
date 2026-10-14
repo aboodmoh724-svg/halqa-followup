@@ -779,3 +779,65 @@ h3 {
 .sheet {
   background: linear-gradient(180deg, #edf5f1, white 220px);
 }
+
+.parent-report-panel {
+  padding: 24px 20px;
+  border: 1px solid #cddfd7;
+  border-top: 3px solid #19786e;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 8px 24px #17324d08;
+}
+.parent-report-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 19px;
+  margin: 0 0 12px;
+}
+.parent-report-panel p {
+  font-size: 13px;
+  color: #667085;
+  margin: 10px 0;
+}
+.parent-report-panel .report-progress {
+  color: #19786e;
+  font-weight: 700;
+  font-size: 15px;
+}
+.parent-report-export {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  margin-top: 20px;
+  min-height: 58px;
+  font-size: 14px;
+}
+.report-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: right;
+  color: #19786e;
+  border-color: #cddfd7;
+}
+.report-shortcut small {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.teacher-guide summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink, #183b50);
+}
+.teacher-guide ol {
+  padding-inline-start: 1.4rem;
+  margin-block: 1rem 0;
+}
+.teacher-guide li {
+  margin-block: 0.65rem;
+  line-height: 1.8;
+}

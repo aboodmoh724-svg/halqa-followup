@@ -6,6 +6,7 @@ import {
   UserRoundX,
   CheckCheck,
   ClipboardList,
+  Download,
 } from "lucide-react";
 import { academyName } from "@/lib/branding";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -22,6 +23,7 @@ import {
   type QuranRange,
 } from "@/lib/quran";
 import {
+  reportIssues,
   labels,
   assessmentLabels,
   type Assessment,
@@ -679,7 +681,9 @@ export default function TeacherFlow() {
     );
   const student = day.students.find((s) => s.enrollmentId === selected);
   const index = day.students.findIndex((s) => s.enrollmentId === selected);
-  const completed = day.students.filter((s) => s.outcome).length;
+  const completed = day.students.filter(
+    (s) => !reportIssues(s, !!day.closedAt).length,
+  ).length;
   const visibleStudents = day.students
     .map((student, index) => ({ student, index }))
     .filter(({ student }) =>
@@ -935,13 +939,14 @@ export default function TeacherFlow() {
               ? "الطالب التالي"
               : "العودة إلى الطلاب"}
           </button>
-          {student.outcome ? (
+          {!reportIssues(student, !!day.closedAt).length ? (
             <a className="report-link" href={report(student.enrollmentId)}>
               تنزيل تقرير الطالب PDF
             </a>
           ) : (
             <p className="subtle report-link">
-              أكمل نتيجتي الحفظ والمراجعة لتفعيل تقرير الطالب.
+              أكمل نتيجتي الحفظ والمراجعة ومدى التسميع وواجب الغد لتفعيل تقرير
+              الطالب.
             </p>
           )}
           {mode && (
@@ -998,13 +1003,50 @@ export default function TeacherFlow() {
           <p className="subtle small-space">
             المقادير تقدير وفق المصحف المدني 604 صفحة، وتُحسب لكل تسميع مسجل.
           </p>
+          <section
+            className="parent-report-panel space"
+            aria-labelledby="parent-report-title"
+          >
+            <h2 id="parent-report-title">
+              <Download size={22} aria-hidden="true" />
+              التقرير اليومي لأولياء الأمور
+            </h2>
+            <p>
+              ملف واحد لكل الطلاب: نتائج ومدى الحفظ والمراجعة، مقادير الصفحات،
+              الغياب، واجب الغد والملاحظات.
+            </p>
+            <p className="report-progress" role="status">
+              التقارير المكتملة: {completed} من {day.students.length}
+            </p>
+            <p id="parent-report-help">
+              لا يُصدّر التقرير حتى تكتمل نتائج ومدى الحفظ والمراجعة وواجب الغد
+              لكل طالب حاضر، ويُحدد واجب الغد للغائب.
+            </p>
+            {completed === day.students.length && completed > 0 ? (
+              <a
+                className="primary parent-report-export"
+                href={report()}
+                aria-describedby="parent-report-help"
+              >
+                <Download size={19} aria-hidden="true" />
+                تصدير التقرير اليومي لأولياء الأمور (PDF)
+              </a>
+            ) : (
+              <button
+                className="primary parent-report-export"
+                disabled
+                aria-describedby="parent-report-help"
+              >
+                <Download size={19} aria-hidden="true" />
+                تصدير التقرير اليومي لأولياء الأمور (PDF)
+              </button>
+            )}
+          </section>
           {completed < day.students.length && (
             <div className="notice space">
-              <p>
-                بقي {day.students.length - completed} طالب بدون نتيجة نهائية
-              </p>
+              <p>بقي {day.students.length - completed} تقارير غير مكتملة</p>
               {day.students
-                .filter((s) => !s.outcome)
+                .filter((s) => reportIssues(s, !!day.closedAt).length)
                 .map((s) => (
                   <button
                     className="text-button"
@@ -1012,6 +1054,9 @@ export default function TeacherFlow() {
                     onClick={() => select(s)}
                   >
                     {s.name} ←
+                    <span className="block subtle">
+                      ينقص: {reportIssues(s, !!day.closedAt).join(" · ")}
+                    </span>
                   </button>
                 ))}
             </div>
@@ -1030,15 +1075,6 @@ export default function TeacherFlow() {
             >
               {busy ? "جارٍ الحفظ…" : "إنهاء يوم الحلقة"}
             </button>
-          )}
-          {completed === day.students.length && completed > 0 ? (
-            <a className="secondary space" href={report()}>
-              تنزيل PDF الحلقة كاملًا
-            </a>
-          ) : (
-            <p className="subtle space">
-              يُتاح تقرير الحلقة بعد تحديد نتيجة كل طالب.
-            </p>
           )}
         </>
       ) : (
@@ -1071,6 +1107,47 @@ export default function TeacherFlow() {
               {day.closedAt ? "تم إنهاء اليوم" : "اختر الطالب وسجّل تسميعه"}
             </p>
           </div>
+          <button
+            className="secondary report-shortcut small-space"
+            disabled={loading || busy}
+            onClick={() => setView("summary")}
+          >
+            <Download size={20} aria-hidden="true" />
+            <span>
+              التقرير اليومي لأولياء الأمور
+              <small>
+                {completed} من {day.students.length} تقارير مكتملة
+              </small>
+            </span>
+          </button>
+          <details className="card teacher-guide small-space">
+            <summary>دليل المعلم · طريقة المتابعة اليومية</summary>
+            <ol>
+              <li>
+                اختر الطالب، وسجّل مدى الحفظ والمراجعة ونتيجة كل منهما: حافظ أو
+                غير حافظ.
+              </li>
+              <li>
+                يمكنك إضافة تسميع آخر في اليوم نفسه. ولتصحيح النتيجة فقط، استخدم
+                بطاقة نتائج اليوم؛ لا تُضاف صفحات جديدة.
+              </li>
+              <li>
+                إذا كان الطالب غير حافظ للدرس الجديد، يُضاف الدرس تلقائيًا إلى
+                واجب الغد، ويمكنك تعديل الواجب.
+              </li>
+              <li>
+                للغياب زر واحد؛ ينقل واجب اليوم إلى الغد، أو يفتح تسجيل الواجب
+                إذا لم يوجد. ويمكن إلغاء الغياب عند حضور الطالب.
+              </li>
+              <li>
+                راجع واجب الغد لكل طالب. يوضح زر تقرير أولياء الأمور ما ينقص،
+                ويتيح تنزيل PDF بعد اكتمال جميع التقارير.
+              </li>
+              <li>
+                أنه اليوم بعد المراجعة النهائية؛ إنهاء اليوم يُغلق التعديل عليه.
+              </li>
+            </ol>
+          </details>
           <div className="space">
             <label htmlFor="student-search">البحث عن طالب</label>
             <input

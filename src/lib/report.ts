@@ -12,6 +12,7 @@ import {
   rangeDescription,
 } from "./quran";
 import {
+  reportIssues,
   assessmentLabels,
   type Assessment,
   labels,
@@ -46,22 +47,28 @@ export function reportMarkup(
           .filter((e) => e.kind === kind)
           .map(
             (e) =>
-              `<li>${escape(rangeText(e))}<span>${formatPages(entryPages(e))} صفحة · ${ayahAmount(e)} آية${e.assessment ? ` · ${assessmentLabels[e.assessment as Assessment]}` : ""}</span></li>`,
+              `<li>${escape(rangeText(e))}<span>${formatPages(entryPages(e))} صفحة · ${ayahAmount(e)} آية${e.assessment ? ` · عند التسميع: ${assessmentLabels[e.assessment as Assessment]}` : ""}</span></li>`,
           )
           .join("") || "<li class='muted'>لا يوجد تسميع مسجل</li>";
-      return `<section class="page"><div class="content"><header><div class="brand">${escape(academyName)}</div><p>${escape(day.halqaName)} · ${escape(date)}</p></header><h1>${escape(s.name)}</h1><div class="status ${s.outcome}">${s.outcome === "ABSENT" ? "غائب" : s.memorizationResult || s.reviewResult ? "نتائج الحفظ والمراجعة" : s.outcome ? `نتيجة سابقة: ${labels[s.outcome]}` : "بانتظار النتيجة"}</div><div class="actual"><article><h2>الحفظ الذي سمعه</h2><p class="assessment">النتيجة: ${s.outcome === "ABSENT" ? "غائب" : s.memorizationResult ? assessmentLabels[s.memorizationResult as Assessment] : "لم تُسجل نتيجة مستقلة"}</p><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "MEMORIZATION")))} صفحة</p><ul>${entries("MEMORIZATION")}</ul></article><article><h2>المراجعة</h2><p class="assessment">النتيجة: ${s.outcome === "ABSENT" ? "غائب" : s.reviewResult ? assessmentLabels[s.reviewResult as Assessment] : "لم تُسجل نتيجة مستقلة"}</p><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "REVIEW")))} صفحة</p><ul>${entries("REVIEW")}</ul></article></div><article class="assignment"><h2>واجب الغد</h2><p><b>الحفظ:</b> ${escape(rangeDescription(s.tomorrow?.memorization))}</p><p><b>المراجعة:</b> ${escape(rangeDescription(s.tomorrow?.review))}</p>${s.tomorrow?.note ? `<p class="note"><b>ملاحظة الواجب:</b> ${escape(s.tomorrow.note)}</p>` : ""}</article>${s.note ? `<article><h2>ملاحظة اليوم</h2><p class="note">${escape(s.note)}</p></article>` : ""}</div><footer>${escape(day.teacherName)}<span>تقرير المتابعة اليومي · ${escape(date)}</span></footer></section>`;
+      return `<section class="page"><div class="content"><header><div class="brand">${escape(academyName)}</div><p class="report-title">التقرير اليومي لأولياء الأمور</p><p>${escape(day.halqaName)} · ${escape(date)}</p></header><h1>${escape(s.name)}</h1><div class="status ${s.outcome}">${s.outcome === "ABSENT" ? "غائب" : s.memorizationResult || s.reviewResult ? "نتائج الحفظ والمراجعة" : s.outcome ? `نتيجة سابقة: ${labels[s.outcome]}` : "بانتظار النتيجة"}</div>${s.today && (s.today.memorization || s.today.review || s.today.note) ? `<article class="today"><h2>المطلوب اليوم</h2><p><b>الحفظ:</b> ${escape(rangeDescription(s.today.memorization))}</p><p><b>المراجعة:</b> ${escape(rangeDescription(s.today.review))}</p>${s.today.note ? `<p class="note"><b>ملاحظة الواجب:</b> ${escape(s.today.note)}</p>` : ""}</article>` : ""}<div class="actual"><article><h2>الحفظ الذي سمعه</h2><p class="assessment">النتيجة النهائية: ${s.outcome === "ABSENT" ? "غائب" : s.memorizationResult ? assessmentLabels[s.memorizationResult as Assessment] : "لم تُسجل نتيجة مستقلة"}</p><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "MEMORIZATION")))} صفحة</p><ul>${entries("MEMORIZATION")}</ul></article><article><h2>المراجعة</h2><p class="assessment">النتيجة النهائية: ${s.outcome === "ABSENT" ? "غائب" : s.reviewResult ? assessmentLabels[s.reviewResult as Assessment] : "لم تُسجل نتيجة مستقلة"}</p><p>الإجمالي: ${formatPages(totalPages(s.entries.filter((e) => e.kind === "REVIEW")))} صفحة</p><ul>${entries("REVIEW")}</ul></article></div><article class="assignment"><h2>واجب الغد</h2><p><b>الحفظ:</b> ${escape(rangeDescription(s.tomorrow?.memorization))}</p><p><b>المراجعة:</b> ${escape(rangeDescription(s.tomorrow?.review))}</p>${s.tomorrow?.note ? `<p class="note"><b>ملاحظة الواجب:</b> ${escape(s.tomorrow.note)}</p>` : ""}</article>${s.note ? `<article><h2>ملاحظة اليوم</h2><p class="note">${escape(s.note)}</p></article>` : ""}</div><footer>${escape(day.teacherName)}<span>تقرير المتابعة اليومي · ${escape(date)}</span></footer></section>`;
     })
     .join("");
   return `<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><style>${fontCss}
-    @page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;color:#17324d;font:16px/1.8 CairoArabic,CairoLatin,sans-serif}.page{position:relative;width:210mm;height:297mm;padding:17mm;background:#f6f5f1;break-after:page;overflow:hidden}.page:last-child{break-after:auto}.content{transform-origin:top right}header{border-bottom:2px solid #19786e;padding-bottom:18px;margin-bottom:24px}header p{color:#667085;margin:4px 0}.brand{font-size:20px;color:#19786e;font-weight:700}h1{font-size:30px;margin:0 0 12px}h2{font-size:18px;margin:0 0 10px}p{margin:6px 0}.status{border-radius:16px;padding:14px 20px;font-size:27px;font-weight:700;margin-bottom:24px;background:#f2f3f4;color:#667085}.MEMORIZED{background:#e9f4f1;color:#19786e}.NOT_MEMORIZED{background:#fbecec;color:#a03f3f}article{background:#fff;border-radius:16px;padding:18px 22px;margin-bottom:16px}.assignment{background:#fbf4e6}.assignment h2{color:#94621b}ul{padding:0;list-style:none;margin:0}li{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px solid #f1f1ee}li:last-child{border:0}li span,.muted{color:#667085;font-size:13px}.note{white-space:pre-wrap;overflow-wrap:anywhere}footer{position:absolute;bottom:12mm;left:17mm;right:17mm;border-top:1px solid #dce1df;padding-top:10px;color:#667085;font-size:12px;display:flex;justify-content:space-between;gap:12px}
+    @page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;color:#17324d;font:16px/1.8 CairoArabic,CairoLatin,sans-serif}.page{position:relative;width:210mm;height:297mm;padding:17mm;background:#f6f5f1;break-after:page;overflow:hidden}.page:last-child{break-after:auto}.content{transform-origin:top right}header{border-bottom:2px solid #19786e;padding-bottom:18px;margin-bottom:24px}header p{color:#667085;margin:4px 0}.brand{font-size:20px;color:#19786e;font-weight:700}h1{font-size:30px;margin:0 0 12px}h2{font-size:18px;margin:0 0 10px}p{margin:6px 0}.status{border-radius:16px;padding:14px 20px;font-size:27px;font-weight:700;margin-bottom:24px;background:#f2f3f4;color:#667085}.MEMORIZED{background:#e9f4f1;color:#19786e}.NOT_MEMORIZED{background:#fbecec;color:#a03f3f}article{background:#fff;border-radius:16px;padding:18px 22px;margin-bottom:16px}.assignment{background:#fbf4e6}.assignment h2{color:#94621b}ul{padding:0;list-style:none;margin:0}li{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px solid #f1f1ee}li:last-child{border:0}li span,.muted{color:#667085;font-size:13px}.note{white-space:pre-wrap;overflow-wrap:anywhere}.report-title{font-weight:700;color:#17324d}.today{background:#f0f5f3}footer{position:absolute;bottom:12mm;left:17mm;right:17mm;border-top:1px solid #dce1df;padding-top:10px;color:#667085;font-size:12px;display:flex;justify-content:space-between;gap:12px}
   </style><body>${pages}</body></html>`;
 }
 export async function generateReport(day: DayView, students: StudentView[]) {
   if (active >= 2)
     throw new HttpError(503, "توليد التقارير مشغول. حاول بعد قليل");
   if (!students.length) throw new HttpError(404, "لا يوجد طلاب للتقرير");
-  if (students.some((s) => !s.outcome))
-    throw new HttpError(409, "حدد النتيجة اليومية لكل طالب في التقرير أولًا");
+  const pending = students.filter(
+    (s) => reportIssues(s, !!day.closedAt).length,
+  );
+  if (pending.length)
+    throw new HttpError(
+      409,
+      `التقرير غير مكتمل: بقي ${pending.length} طالب. أكمل نتائج ومدى الحفظ والمراجعة وواجب الغد؛ وللغائب حدد واجب الغد.`,
+    );
   active++;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
