@@ -215,10 +215,9 @@ export async function mutateDay(
     }
     if (
       m.action === "assessment" &&
-      m.assessment === "MASTERED" &&
       !status.entries.some((e) => e.kind === m.kind)
     )
-      throw new HttpError(409, "سجل التسميع أولًا قبل اختيار حافظ");
+      throw new HttpError(409, "سجل مدى التسميع أولًا قبل تعديل النتيجة");
     if (m.action === "assessment" || (m.action === "entry" && m.assessment)) {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل تسجيل النتيجة");

@@ -42,6 +42,17 @@ test(
         /الحلقة غير موجودة/,
       );
       await ensureDay(teacher.id, halqa.id);
+      await assert.rejects(
+        () =>
+          mutateDay(teacher.id, halqa.id, {
+            action: "assessment",
+            date: today,
+            enrollmentId: enrollment.id,
+            kind: "MEMORIZATION",
+            assessment: "NOT_MASTERED",
+          }),
+        /سجل مدى التسميع/,
+      );
       assert.deepEqual(
         (await getDay(teacher.id, halqa.id)).students[0].today?.memorization,
         range,
@@ -219,7 +230,9 @@ test(
         /بدون نتيجة/,
       );
       await mutateDay(teacher.id, halqa.id, {
-        action: "assessment",
+        action: "entry",
+        range: nextRange,
+        requestKey: randomUUID(),
         date: today,
         enrollmentId: enrollment.id,
         kind: "REVIEW",
@@ -229,21 +242,30 @@ test(
       assert.equal(day.students[0].memorizationResult, "MASTERED");
       assert.equal(day.students[0].reviewResult, "NOT_MASTERED");
       assert.equal(day.students[0].outcome, "NOT_MEMORIZED");
-      assert.equal(day.students[0].entries.length, 2);
+      assert.equal(day.students[0].entries.length, 3);
+      await assert.rejects(() =>
+        mutateDay(teacher.id, halqa.id, {
+          action: "assessment",
+          date: today,
+          enrollmentId: enrollment.id,
+          kind: "REVIEW",
+          assessment: "NOT_REQUIRED",
+        }),
+      );
       await mutateDay(teacher.id, halqa.id, {
         action: "assessment",
         date: today,
         enrollmentId: enrollment.id,
         kind: "REVIEW",
-        assessment: "NOT_REQUIRED",
+        assessment: "MASTERED",
       });
       day = await getDay(teacher.id, halqa.id);
-      assert.equal(day.students[0].reviewResult, "NOT_REQUIRED");
+      assert.equal(day.students[0].reviewResult, "MASTERED");
       assert.equal(day.students[0].outcome, "MEMORIZED");
       await mutateDay(teacher.id, halqa.id, { action: "close", date: today });
       day = await getDay(teacher.id, halqa.id);
       assert.ok(day.closedAt);
-      assert.equal(day.students[0].entries.length, 2);
+      assert.equal(day.students[0].entries.length, 3);
       await assert.rejects(
         () =>
           mutateDay(teacher.id, halqa.id, {

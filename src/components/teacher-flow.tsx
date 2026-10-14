@@ -194,7 +194,6 @@ function Sheet({
           : student.memorizationResult) as Assessment) ?? "")
       : "",
   );
-  const [recited, setRecited] = useState(true);
 
   const [error, setError] = useState("");
   const requestKey = useRef<string>("");
@@ -216,21 +215,11 @@ function Sheet({
     setError("");
     let data: Record<string, unknown>;
     if (mode === "memory" || mode === "review" || resultOnly) {
-      if (!assessment) {
+      if (assessment !== "MASTERED" && assessment !== "NOT_MASTERED") {
         setError("اختر نتيجة التسميع أولًا");
         return;
       }
-      if (
-        !recited &&
-        assessment === "MASTERED" &&
-        !student.entries.some(
-          (e) => e.kind === (isReview ? "REVIEW" : "MEMORIZATION"),
-        )
-      ) {
-        setError("لتسجيل حافظ، أدخل الآيات التي سمعها الطالب");
-        return;
-      }
-      if (resultOnly || !recited || assessment === "NOT_REQUIRED") {
+      if (resultOnly) {
         if (
           await onSave({
             action: "assessment",
@@ -325,46 +314,28 @@ function Sheet({
             <fieldset className="assessment-picker">
               <legend>نتيجة {isReview ? "المراجعة" : "الحفظ"}</legend>
               <div className="assessment-options">
-                {(["MASTERED", "NOT_MASTERED", "NOT_REQUIRED"] as const).map(
-                  (value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`assessment-choice ${value}`}
-                      aria-pressed={assessment === value}
-                      onClick={() => {
-                        setAssessment(value);
-                        setError("");
-                      }}
-                    >
-                      {assessmentLabels[value]}
-                    </button>
-                  ),
-                )}
+                {(["MASTERED", "NOT_MASTERED"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`assessment-choice ${value}`}
+                    aria-pressed={assessment === value}
+                    onClick={() => {
+                      setAssessment(value);
+                      setError("");
+                    }}
+                  >
+                    {assessmentLabels[value]}
+                  </button>
+                ))}
               </div>
             </fieldset>
-            {!resultOnly && assessment !== "NOT_REQUIRED" && (
-              <>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={recited}
-                    onChange={(e) => setRecited(e.target.checked)}
-                  />
-                  سمّع الطالب آيات اليوم
-                </label>
-                {recited ? (
-                  <RangeFields
-                    title="مدى التسميع"
-                    value={range}
-                    onChange={setRange}
-                  />
-                ) : (
-                  <p className="notice">
-                    تُحفظ النتيجة فقط، دون إضافة آيات أو صفحات لم يسمعها المعلم.
-                  </p>
-                )}
-              </>
+            {!resultOnly && (
+              <RangeFields
+                title="مدى التسميع"
+                value={range}
+                onChange={setRange}
+              />
             )}
           </>
         )}

@@ -73,7 +73,7 @@ export const mutationSchema = z.discriminatedUnion("action", [
     enrollmentId: z.string().min(1),
     date: z.string(),
     kind: z.enum(["MEMORIZATION", "REVIEW"]),
-    assessment: z.enum(["MASTERED", "NOT_MASTERED", "NOT_REQUIRED"]),
+    assessment: z.enum(["MASTERED", "NOT_MASTERED"]),
   }),
   z.object({
     action: z.literal("status"),

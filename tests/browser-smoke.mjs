@@ -213,24 +213,28 @@ try {
     .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
     .click();
   await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
-  await dialog
-    .getByRole("button", { name: "غير مطلوب اليوم", exact: true })
-    .click();
+  assert.equal(
+    await dialog
+      .getByRole("button", { name: "غير مطلوب اليوم", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(await dialog.getByLabel("سمّع الطالب آيات اليوم").count(), 0);
+  await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
   await dialog
     .getByRole("button", { name: "حفظ التسجيل", exact: true })
     .click();
   await dialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
-  await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
-  await dialog.getByLabel("سمّع الطالب آيات اليوم").uncheck();
+  await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
   await dialog
     .getByRole("button", { name: "حفظ التسجيل", exact: true })
     .click();
   await dialog.waitFor({ state: "hidden" });
   const after = await (await context.request.get(url)).json();
-  assert.equal(after.students[1].entries.length, 0);
-  assert.equal(after.students[1].memorizationResult, "NOT_REQUIRED");
-  assert.equal(after.students[1].reviewResult, "NOT_MASTERED");
+  assert.equal(after.students[1].entries.length, 2);
+  assert.equal(after.students[1].memorizationResult, "NOT_MASTERED");
+  assert.equal(after.students[1].reviewResult, "MASTERED");
   await page.screenshot({
     path: "work/smoke/no-recitation-result.png",
     fullPage: true,

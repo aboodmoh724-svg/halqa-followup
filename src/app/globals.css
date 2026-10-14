@@ -682,7 +682,7 @@ h3 {
   min-height: 48px;
 }
 .assessment-choice:last-child {
-  grid-column: 1/-1;
+  grid-column: auto;
 }
 .assessment-choice[aria-pressed="true"] {
   outline: 2px solid #19786e;
