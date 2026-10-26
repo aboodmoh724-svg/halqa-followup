@@ -251,12 +251,12 @@ export default function TeacherFlow() {
               autoComplete="off"
               type="text"
               inputMode="numeric"
-              pattern="[0-9]{6}"
-              minLength={6}
+              pattern="([0-9]{4}|[0-9]{6})"
+              minLength={4}
               maxLength={6}
               required
               dir="ltr"
-              placeholder="— — — — — —"
+              placeholder="— — — —"
               value={code}
               onChange={(e) =>
                 setCode(

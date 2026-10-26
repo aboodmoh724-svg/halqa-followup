@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import { z } from "zod";
+import { loginSchema } from "@/lib/login-schema";
 import { db } from "@/lib/db";
 import { codeLookup, verifyCode, tokenHash } from "@/lib/crypto";
 import { apiError, checkOrigin, cookieName, HttpError } from "@/lib/auth";
@@ -17,9 +17,7 @@ async function bucket(key: string, limit: number) {
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
-    const input = z
-      .object({ code: z.string().regex(/^\d{6}$/), remember: z.boolean() })
-      .parse(await request.json());
+    const input = loginSchema.parse(await request.json());
     const lookup = codeLookup(input.code);
     const ip =
       process.env.TRUST_PROXY === "true"

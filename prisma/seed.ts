@@ -4,8 +4,8 @@ import { dayDate, dayKey } from "../src/lib/dates";
 const db = new PrismaClient();
 async function main() {
   const code = process.env.SEED_TEACHER_CODE;
-  if (!code || !/^\d{6}$/.test(code))
-    throw new Error("Set SEED_TEACHER_CODE to a random six-digit code");
+  if (!code || !/^(?:\d{4}|\d{6})$/.test(code))
+    throw new Error("Set SEED_TEACHER_CODE to a four- or six-digit code");
   const teacher = await db.teacher.upsert({
     where: { id: "seed-teacher" },
     update: {},
