@@ -1,12 +1,29 @@
 import { z } from "zod";
 import { rangeSchema, type QuranRange } from "./quran";
 export const labels = {
-  MEMORIZED: "حفظ",
-  NOT_MEMORIZED: "لم يحفظ",
+  MEMORIZED: "حافظ",
+  NOT_MEMORIZED: "غير حافظ",
   ABSENT: "غائب",
 } as const;
 export type Outcome = keyof typeof labels;
+export const assessmentLabels = {
+  MASTERED: "حافظ",
+  NOT_MASTERED: "غير حافظ",
+  NOT_REQUIRED: "غير مطلوب اليوم",
+} as const;
+export type Assessment = keyof typeof assessmentLabels;
+export function independentSummary(
+  memory: string | null | undefined,
+  review: string | null | undefined,
+): Outcome | null {
+  if (!memory || !review) return null;
+  return memory === "NOT_MASTERED" || review === "NOT_MASTERED"
+    ? "NOT_MEMORIZED"
+    : "MEMORIZED";
+}
 export type AssignmentView = {
+  autoMemorizationStatusId?: string | null;
+  memorizationManual?: boolean;
   id: string;
   memorization: QuranRange | null;
   review: QuranRange | null;
@@ -14,6 +31,7 @@ export type AssignmentView = {
   imageName: string;
 };
 export type EntryView = QuranRange & {
+  assessment?: string | null;
   id: string;
   kind: "MEMORIZATION" | "REVIEW";
   createdAt: string;
@@ -21,6 +39,8 @@ export type EntryView = QuranRange & {
   pageMappingVersion: string | null;
 };
 export type StudentView = {
+  memorizationResult?: string | null;
+  reviewResult?: string | null;
   enrollmentId: string;
   name: string;
   outcome: Outcome | null;
@@ -36,16 +56,32 @@ export type DayView = {
   date: string;
   timezone: string;
   closedAt: string | null;
+  readOnlyReason?: string | null;
   students: StudentView[];
 };
 export const mutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("edit-entry"),
+    enrollmentId: z.string().min(1),
+    date: z.string(),
+    entryId: z.string().min(1),
+    range: rangeSchema,
+  }),
   z.object({
     action: z.literal("entry"),
     enrollmentId: z.string().min(1),
     date: z.string(),
     kind: z.enum(["MEMORIZATION", "REVIEW"]),
+    assessment: z.enum(["MASTERED", "NOT_MASTERED"]).optional(),
     range: rangeSchema,
     requestKey: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("assessment"),
+    enrollmentId: z.string().min(1),
+    date: z.string(),
+    kind: z.enum(["MEMORIZATION", "REVIEW"]),
+    assessment: z.enum(["MASTERED", "NOT_MASTERED"]),
   }),
   z.object({
     action: z.literal("status"),
@@ -66,3 +102,36 @@ export const mutationSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("close"), date: z.string() }),
 ]);
+
+export function reportIssues(
+  student: StudentView,
+  legacyClosed = false,
+): string[] {
+  if (
+    legacyClosed &&
+    student.outcome &&
+    !student.memorizationResult &&
+    !student.reviewResult
+  )
+    return [];
+  const issues: string[] = [];
+  if (student.outcome !== "ABSENT") {
+    if (
+      !student.memorizationResult ||
+      !["MASTERED", "NOT_MASTERED"].includes(student.memorizationResult)
+    )
+      issues.push("نتيجة الحفظ الجديد");
+    if (
+      !student.reviewResult ||
+      !["MASTERED", "NOT_MASTERED"].includes(student.reviewResult)
+    )
+      issues.push("نتيجة المراجعة");
+    if (!student.entries.some((e) => e.kind === "MEMORIZATION"))
+      issues.push("مدى الحفظ الجديد");
+    if (!student.entries.some((e) => e.kind === "REVIEW"))
+      issues.push("مدى المراجعة");
+  }
+  if (!student.tomorrow?.memorization && !student.tomorrow?.review)
+    issues.push("واجب الغد");
+  return issues;
+}

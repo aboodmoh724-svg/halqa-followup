@@ -109,6 +109,7 @@ test("individual and collective report markup include calculated page amounts", 
     [student, { ...student, enrollmentId: "e2" }],
     "",
   );
-  assert.equal((markup.match(/class="page"/g) || []).length, 2);
+  assert.equal((markup.match(/class="page"/g) || []).length, 1);
+  assert.equal((markup.match(/data-student=/g) || []).length, 2);
   assert.match(markup, /صفحة/);
 });
