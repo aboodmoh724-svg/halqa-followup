@@ -65,7 +65,7 @@ test(
             date: today,
             enrollmentId: enrollment.id,
             kind: "MEMORIZATION",
-            assessment: "NOT_MASTERED",
+            assessment: "MASTERED",
           }),
         /سجل مدى التسميع/,
       );
@@ -259,7 +259,7 @@ test(
         date: today,
         enrollmentId: enrollment.id,
         outcome: "NOT_MEMORIZED",
-        note: "تسميع فعلي مع نتيجة لم يحفظ",
+        note: "تسميع فعلي مع نتيجة غير حافظ",
         carry: false,
       });
       const nextRange = {

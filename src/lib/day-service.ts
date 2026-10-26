@@ -10,6 +10,7 @@ import {
   type AssignmentView,
 } from "./types";
 import { rangeSchema, pageAmount } from "./quran";
+import { suggestAssignment } from "./assignment-suggestions";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
@@ -111,6 +112,45 @@ export async function getDay(
     },
   });
   if (!session) throw new HttpError(404, "لم يبدأ يوم الحلقة");
+  const since = dayDate(date);
+  since.setUTCDate(since.getUTCDate() - 13);
+  // One bounded query for the whole class, restricted to this teacher's halqa.
+  const history = session.closedAt
+    ? []
+    : await db.dailyStudentStatus.findMany({
+        where: {
+          halqaId,
+          session: {
+            date: { gte: since, lte: dayDate(date) },
+            halqa: { teacherId },
+          },
+        },
+        include: {
+          session: { select: { date: true } },
+          entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+        },
+      });
+  const histories = new Map<string, Parameters<typeof suggestAssignment>[0]>();
+  for (const h of history) {
+    if (h.outcome === "ABSENT") continue;
+    const days = histories.get(h.enrollmentId) ?? [];
+    days.push({
+      date: h.session.date.toISOString().slice(0, 10),
+      entries: h.entries
+        .filter(
+          (e) =>
+            (e.kind === "MEMORIZATION"
+              ? h.memorizationResult
+              : h.reviewResult) === "MASTERED",
+        )
+        .map((e) => ({
+          ...e,
+          createdAt: e.createdAt.toISOString(),
+          pageAmount: e.pageAmount === null ? null : Number(e.pageAmount),
+        })),
+    });
+    histories.set(h.enrollmentId, days);
+  }
   return {
     halqaId,
     halqaName: session.halqa.name,
@@ -121,6 +161,19 @@ export async function getDay(
     readOnlyReason: dayReadOnlyReason(date),
     students: session.statuses.map((s) => ({
       enrollmentId: s.enrollmentId,
+      suggestions: {
+        memorization:
+          s.outcome === "ABSENT" || s.memorizationResult === "NOT_MASTERED"
+            ? null
+            : suggestAssignment(
+                histories.get(s.enrollmentId) ?? [],
+                "MEMORIZATION",
+              ),
+        review:
+          s.outcome === "ABSENT" || s.reviewResult === "NOT_MASTERED"
+            ? null
+            : suggestAssignment(histories.get(s.enrollmentId) ?? [], "REVIEW"),
+      },
       name: s.enrollment.student.name,
       outcome: s.outcome,
       memorizationResult: s.memorizationResult,
@@ -290,6 +343,7 @@ export async function mutateDay(
     }
     if (
       m.action === "assessment" &&
+      m.assessment === "MASTERED" &&
       !status.entries.some((e) => e.kind === m.kind)
     )
       throw new HttpError(409, "سجل مدى التسميع أولًا قبل تعديل النتيجة");
@@ -347,7 +401,13 @@ export async function mutateDay(
                 }
               : today?.memorization;
         const range = rangeSchema.safeParse(candidate);
-        if (range.success) {
+        if (
+          range.success &&
+          !tomorrow?.memorizationManual &&
+          (!tomorrow ||
+            tomorrow.autoMemorizationStatusId === status.id ||
+            (today && tomorrow.carriedFromId === today.id))
+        ) {
           await tx.assignment.upsert({
             where,
             create: {
@@ -374,7 +434,18 @@ export async function mutateDay(
         });
       }
     }
+    if (m.action === "note") {
+      await tx.dailyStudentStatus.update({
+        where: { id: status.id },
+        data: { note: m.note.trim() },
+      });
+    }
     if (m.action === "status") {
+      // Older clients sent the whole student snapshot when saving a note.
+      // Preserve the authoritative results unless explicitly changing attendance.
+      const attendanceChange =
+        m.outcome === "ABSENT" ||
+        (status.outcome === "ABSENT" && m.outcome === null);
       if (m.outcome === "ABSENT" && status.entries.length)
         throw new HttpError(
           409,
@@ -383,7 +454,7 @@ export async function mutateDay(
       await tx.dailyStudentStatus.update({
         where: { id: status.id },
         data: {
-          outcome: m.outcome,
+          ...(attendanceChange ? { outcome: m.outcome } : {}),
           note: m.note,
           ...(status.outcome === "ABSENT" && m.outcome === null
             ? { memorizationResult: null, reviewResult: null }
