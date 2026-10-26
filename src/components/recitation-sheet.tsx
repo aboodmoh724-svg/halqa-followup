@@ -141,10 +141,11 @@ export default function Sheet({
     student.tomorrow?.review ?? student.today?.review ?? initialRange,
   );
   const [memoryEnabled, setMemoryEnabled] = useState(
-    !!student.tomorrow?.memorization || !student.tomorrow,
+    !student.reviewOnly &&
+      (!!student.tomorrow?.memorization || !student.tomorrow),
   );
   const [reviewEnabled, setReviewEnabled] = useState(
-    !!student.tomorrow?.review || !student.tomorrow,
+    !!student.reviewOnly || !!student.tomorrow?.review || !student.tomorrow,
   );
   const [note, setNote] = useState(
     mode === "assignment" ? (student.tomorrow?.note ?? "") : student.note,
@@ -373,7 +374,12 @@ export default function Sheet({
           <>
             {(["memorization", "review"] as const).map((kind) => {
               const suggestion = student.suggestions?.[kind];
-              if (!suggestion || student.tomorrow?.[kind]) return null;
+              if (
+                !suggestion ||
+                student.tomorrow?.[kind] ||
+                (student.reviewOnly && kind === "memorization")
+              )
+                return null;
               return (
                 <div className="notice" key={kind}>
                   <strong>
@@ -404,14 +410,16 @@ export default function Sheet({
                 </div>
               );
             })}
-            {student.tomorrow?.autoMemorizationStatusId && (
-              <p className="notice">
-                الطالب غير حافظ الدرس الجديد:{" "}
-                {rangeText(student.tomorrow.memorization)}. تم إضافته تلقائيًا
-                إلى واجب الغد؛ يمكنك تعديله.
-              </p>
-            )}
-            {student.memorizationResult === "NOT_MASTERED" &&
+            {!student.reviewOnly &&
+              student.tomorrow?.autoMemorizationStatusId && (
+                <p className="notice">
+                  الطالب غير حافظ الدرس الجديد:{" "}
+                  {rangeText(student.tomorrow.memorization)}. تم إضافته تلقائيًا
+                  إلى واجب الغد؛ يمكنك تعديله.
+                </p>
+              )}
+            {!student.reviewOnly &&
+              student.memorizationResult === "NOT_MASTERED" &&
               student.tomorrow?.memorizationManual && (
                 <p className="notice">
                   الطالب غير حافظ الدرس الجديد. أبقينا واجب الغد الذي حددته
@@ -424,29 +432,33 @@ export default function Sheet({
                   الطالب غائب ولا يوجد واجب سابق؛ حدد واجب الغد الآن.
                 </p>
               )}
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={memoryEnabled}
-                onChange={(e) => setMemoryEnabled(e.target.checked)}
-              />
-              واجب حفظ
-            </label>
-            {memoryEnabled && (
+            {!student.reviewOnly && (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={memoryEnabled}
+                  onChange={(e) => setMemoryEnabled(e.target.checked)}
+                />
+                واجب حفظ
+              </label>
+            )}
+            {!student.reviewOnly && memoryEnabled && (
               <RangeFields
                 title="مدى الحفظ"
                 value={memory}
                 onChange={setMemory}
               />
             )}
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={reviewEnabled}
-                onChange={(e) => setReviewEnabled(e.target.checked)}
-              />
-              واجب مراجعة
-            </label>
+            {!student.reviewOnly && (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={reviewEnabled}
+                  onChange={(e) => setReviewEnabled(e.target.checked)}
+                />
+                واجب مراجعة
+              </label>
+            )}
             {reviewEnabled && (
               <RangeFields
                 title="مدى المراجعة"

@@ -371,6 +371,9 @@ export default function TeacherFlow() {
               الطلاب ←
             </button>
           </div>
+          {student.reviewOnly && (
+            <p className="notice">طالب حافظ · مراجعة فقط</p>
+          )}
           {locked && (
             <p className="notice closed small-space">
               {day.readOnlyReason || "تم إنهاء الحلقة لهذا اليوم"}
@@ -378,7 +381,9 @@ export default function TeacherFlow() {
           )}
           <div className="assignment-today">
             <h3>واجب اليوم</h3>
-            <p>الحفظ: {rangeDescription(student.today?.memorization)}</p>
+            {!student.reviewOnly && (
+              <p>الحفظ: {rangeDescription(student.today?.memorization)}</p>
+            )}
             <p>المراجعة: {rangeDescription(student.today?.review)}</p>
             {student.today?.note && (
               <p className="subtle">{student.today.note}</p>
@@ -419,10 +424,17 @@ export default function TeacherFlow() {
                 نقل واجب اليوم للغد
               </button>
             )}
-          <div className="actions">
+          <div
+            className="actions"
+            style={
+              student.reviewOnly
+                ? { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }
+                : undefined
+            }
+          >
             <button
               className="action memory"
-              hidden={student.outcome === "ABSENT"}
+              hidden={student.outcome === "ABSENT" || student.reviewOnly}
               disabled={busy || locked || student.outcome === "ABSENT"}
               onClick={() => setMode("memory")}
             >
@@ -514,8 +526,18 @@ export default function TeacherFlow() {
                 <CheckCheck size={18} aria-hidden="true" />
                 نتائج اليوم
               </h3>
-              <div className="assessment-summary-grid">
-                {(["MEMORIZATION", "REVIEW"] as const).map((kind) => {
+              <div
+                className="assessment-summary-grid"
+                style={
+                  student.reviewOnly
+                    ? { gridTemplateColumns: "1fr" }
+                    : undefined
+                }
+              >
+                {(student.reviewOnly
+                  ? (["REVIEW"] as const)
+                  : (["MEMORIZATION", "REVIEW"] as const)
+                ).map((kind) => {
                   const value =
                     kind === "MEMORIZATION"
                       ? student.memorizationResult
@@ -580,7 +602,9 @@ export default function TeacherFlow() {
           {student.tomorrow && (
             <section className="card small-space">
               <h3>واجب الغد</h3>
-              <p>الحفظ: {rangeDescription(student.tomorrow.memorization)}</p>
+              {!student.reviewOnly && (
+                <p>الحفظ: {rangeDescription(student.tomorrow.memorization)}</p>
+              )}
               <p>المراجعة: {rangeDescription(student.tomorrow.review)}</p>
               {student.tomorrow.note && (
                 <p className="subtle">{student.tomorrow.note}</p>
@@ -606,7 +630,9 @@ export default function TeacherFlow() {
             </a>
           ) : (
             <p className="subtle report-link">
-              أكمل نتيجتي الحفظ والمراجعة وواجب الغد؛ ولنتيجة حافظ سجل التسميع
+              {student.reviewOnly
+                ? "أكمل نتيجة المراجعة وواجب الغد؛ ولنتيجة حافظ سجل التسميع"
+                : "أكمل نتيجتي الحفظ والمراجعة وواجب الغد؛ ولنتيجة حافظ سجل التسميع"}
               لتفعيل تقرير الطالب.
             </p>
           )}
@@ -847,6 +873,9 @@ export default function TeacherFlow() {
                 <span className="index">{i + 1}</span>
                 <span className="name">
                   {s.name}
+                  {s.reviewOnly && (
+                    <span className="subtle block">حافظ · مراجعة فقط</span>
+                  )}
                   <span className="subtle block">
                     {s.entries.length
                       ? `${s.entries.length} تسميع اليوم`
@@ -856,6 +885,8 @@ export default function TeacherFlow() {
                 <span className="student-result-label">
                   {s.outcome === "ABSENT" ? (
                     "غائب"
+                  ) : s.reviewOnly ? (
+                    `مراجعة: ${s.reviewResult ? assessmentLabels[s.reviewResult as Assessment] : "بانتظار التسجيل"}`
                   ) : s.memorizationResult || s.reviewResult ? (
                     `حفظ: ${s.memorizationResult ? assessmentLabels[s.memorizationResult as Assessment] : "بانتظار التسجيل"} · مراجعة: ${s.reviewResult ? assessmentLabels[s.reviewResult as Assessment] : "بانتظار التسجيل"}`
                   ) : (
