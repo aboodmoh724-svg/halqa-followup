@@ -4,6 +4,7 @@ import "@fontsource/cairo/400.css";
 import "@fontsource/cairo/600.css";
 import "@fontsource/cairo/700.css";
 import "./globals.css";
+import "./teacher-workspace.css";
 export const metadata: Metadata = {
   title: `${academyName} · متابعة الحلقة`,
   description: "المتابعة اليومية للحلقات القرآنية",

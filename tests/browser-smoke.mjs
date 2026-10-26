@@ -251,6 +251,14 @@ try {
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     await page.screenshot({ path: "work/smoke/student.png", fullPage: true });
+    await page.getByRole("button", { name: "سجل الطالب", exact: true }).click();
+    await page.getByText("مجموع التسميع المسجل", { exact: true }).waitFor();
+    await page.screenshot({ path: "work/smoke/student-history.png", fullPage: true });
+    await page.getByRole("button", { name: "أسبوع", exact: true }).click();
+    await page.getByRole("button", { name: "الأسبوع السابق", exact: true }).waitFor();
+    await page.getByRole("button", { name: "السجل الكامل", exact: true }).click();
+    await page.getByLabel("من تاريخ", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "تسجيل اليوم", exact: true }).click();
     const individual = await context.request.get(
       new URL(
         await page
