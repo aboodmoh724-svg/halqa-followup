@@ -21,9 +21,11 @@ export function collectiveReportMarkup(
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${day.date}T00:00:00Z`));
-  const assignment = (a: StudentView["today"]) =>
-    `<div><b>حفظ:</b> ${escape(rangeDescription(a?.memorization))}</div><div><b>مراجعة:</b> ${escape(rangeDescription(a?.review))}</div>`;
+  const assignment = (a: StudentView["today"], reviewOnly = false) =>
+    `${!reviewOnly ? `<div><b>حفظ:</b> ${escape(rangeDescription(a?.memorization))}</div>` : ""}<div><b>مراجعة:</b> ${escape(rangeDescription(a?.review))}</div>`;
   const actual = (s: StudentView, kind: "MEMORIZATION" | "REVIEW") => {
+    if (s.reviewOnly && kind === "MEMORIZATION")
+      return `<span class="track-label">${reportIcon("review")}مراجعة فقط</span>`;
     const absent = s.outcome === "ABSENT";
     const entries = s.entries.filter((e) => e.kind === kind);
     const ranges = new Map<string, number>();
@@ -39,7 +41,7 @@ export function collectiveReportMarkup(
         s.note,
         s.tomorrow?.note ? `واجب الغد: ${s.tomorrow.note}` : "",
       ].filter(Boolean);
-      return `<tr data-student="${escape(s.enrollmentId)}"><td class="student"><span class="number">${i + 1}</span>${escape(s.name)}</td><td>${actual(s, "MEMORIZATION")}</td><td>${actual(s, "REVIEW")}</td><td class="homework">${assignment(s.tomorrow)}</td><td class="notes">${notes.length ? `<div class="note-box"><span class="note-label">${reportIcon("note")}ملاحظة</span>${notes.map((n) => `<div>${escape(n!)}</div>`).join("")}</div>` : "—"}</td></tr>`;
+      return `<tr data-student="${escape(s.enrollmentId)}"><td class="student"><span class="number">${i + 1}</span>${escape(s.name)}</td><td>${actual(s, "MEMORIZATION")}</td><td>${actual(s, "REVIEW")}</td><td class="homework">${assignment(s.tomorrow, s.reviewOnly)}</td><td class="notes">${notes.length ? `<div class="note-box"><span class="note-label">${reportIcon("note")}ملاحظة</span>${notes.map((n) => `<div>${escape(n!)}</div>`).join("")}</div>` : "—"}</td></tr>`;
     })
     .join("");
   return `<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><style>${fontCss}

@@ -460,6 +460,59 @@ try {
       path: "work/smoke/no-recitation-result.png",
       fullPage: true,
     });
+    // A hafiz can complete the day by recording review alone.
+    await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
+    await page
+      .getByRole("button", { name: new RegExp(day.students[3].name) })
+      .click();
+    await page
+      .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
+      .click();
+    await page.getByText("مسار الطالب", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "حافظ · مراجعة فقط", exact: true })
+      .click();
+    await page.locator('main[aria-busy="false"]').waitFor();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "+ حفظ جديد", exact: true })
+        .isVisible(),
+      false,
+    );
+    await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
+    await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
+    await dialog
+      .getByRole("button", { name: "حفظ التسجيل", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    const hafizDay = await (await context.request.get(url)).json();
+    assert.equal(hafizDay.students[3].reviewOnly, true);
+    assert.equal(hafizDay.students[3].memorizationResult, null);
+    assert.equal(hafizDay.students[3].reviewResult, "MASTERED");
+    assert.equal(hafizDay.students[3].outcome, "MEMORIZED");
+    assert.equal(hafizDay.students[3].entries.length, 1);
+    await page.screenshot({
+      path: "work/smoke/hafiz-student.png",
+      fullPage: true,
+    });
+    await page
+      .getByRole("button", { name: "+ واجب الغد", exact: true })
+      .click();
+    assert.equal(
+      await dialog
+        .getByRole("group", { name: "مدى الحفظ", exact: true })
+        .count(),
+      0,
+    );
+    await page.screenshot({ path: "work/smoke/hafiz-assignment.png" });
+    await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    const hafizPdf = await context.request.get(
+      `${url}/report?date=${day.date}&student=${day.students[3].enrollmentId}`,
+      { timeout: 90000 },
+    );
+    assert.equal(hafizPdf.status(), 200);
+    await writeFile("work/smoke/hafiz.pdf", await hafizPdf.body());
     // Fixture setup is guarded by the isolated TEST database check above.
     const { PrismaClient } = await import("@prisma/client");
     const fixtureDb = new PrismaClient();
@@ -482,6 +535,11 @@ try {
     await page
       .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
       .click();
+    await page.getByText("مسار الطالب", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "حافظ · مراجعة فقط", exact: true })
+      .click();
+    await page.locator('main[aria-busy="false"]').waitFor();
     await page.getByRole("button", { name: "غائب اليوم", exact: true }).click();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await page
@@ -492,7 +550,8 @@ try {
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     const absentDay = await (await context.request.get(url)).json();
-    assert.ok(absentDay.students.at(-1).tomorrow.memorization);
+    assert.equal(absentDay.students.at(-1).tomorrow.memorization, null);
+    assert.ok(absentDay.students.at(-1).tomorrow.review);
     assert.equal(absentDay.students.at(-1).outcome, "ABSENT");
     const all = await context.request.get(`${url}/report?date=${day.date}`, {
       timeout: 90000,

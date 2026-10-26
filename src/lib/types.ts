@@ -15,7 +15,14 @@ export type Assessment = keyof typeof assessmentLabels;
 export function independentSummary(
   memory: string | null | undefined,
   review: string | null | undefined,
+  reviewOnly = false,
 ): Outcome | null {
+  if (reviewOnly)
+    return review === "MASTERED"
+      ? "MEMORIZED"
+      : review === "NOT_MASTERED"
+        ? "NOT_MEMORIZED"
+        : null;
   if (!memory || !review) return null;
   return memory === "NOT_MASTERED" || review === "NOT_MASTERED"
     ? "NOT_MEMORIZED"
@@ -39,6 +46,7 @@ export type EntryView = QuranRange & {
   pageMappingVersion: string | null;
 };
 export type StudentView = {
+  reviewOnly?: boolean;
   suggestions?: {
     memorization: AssignmentSuggestion | null;
     review: AssignmentSuggestion | null;
@@ -69,6 +77,12 @@ export type DayView = {
   students: StudentView[];
 };
 export const mutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("track"),
+    enrollmentId: z.string().min(1),
+    date: z.string(),
+    reviewOnly: z.boolean(),
+  }),
   z.object({
     action: z.literal("note"),
     enrollmentId: z.string().min(1),
@@ -132,8 +146,9 @@ export function reportIssues(
   const issues: string[] = [];
   if (student.outcome !== "ABSENT") {
     if (
-      !student.memorizationResult ||
-      !["MASTERED", "NOT_MASTERED"].includes(student.memorizationResult)
+      !student.reviewOnly &&
+      (!student.memorizationResult ||
+        !["MASTERED", "NOT_MASTERED"].includes(student.memorizationResult))
     )
       issues.push("نتيجة الحفظ الجديد");
     if (
@@ -142,6 +157,7 @@ export function reportIssues(
     )
       issues.push("نتيجة المراجعة");
     if (
+      !student.reviewOnly &&
       student.memorizationResult === "MASTERED" &&
       !student.entries.some((e) => e.kind === "MEMORIZATION")
     )
@@ -152,7 +168,11 @@ export function reportIssues(
     )
       issues.push("مدى المراجعة");
   }
-  if (!student.tomorrow?.memorization && !student.tomorrow?.review)
+  if (
+    student.reviewOnly
+      ? !student.tomorrow?.review
+      : !student.tomorrow?.memorization && !student.tomorrow?.review
+  )
     issues.push("واجب الغد");
   return issues;
 }

@@ -53,6 +53,7 @@ export async function ensureDay(
           sessionId: session.id,
           enrollmentId: e.id,
           halqaId,
+          reviewOnly: e.reviewOnly,
         })),
         skipDuplicates: true,
       });
@@ -71,11 +72,15 @@ function assignmentView(
         memorizationManual: boolean;
       }
     | undefined,
+  reviewOnly = false,
 ): AssignmentView | null {
   return a
     ? {
         id: a.id,
-        memorization: a.memorization ? rangeSchema.parse(a.memorization) : null,
+        memorization:
+          !reviewOnly && a.memorization
+            ? rangeSchema.parse(a.memorization)
+            : null,
         review: a.review ? rangeSchema.parse(a.review) : null,
         note: a.note,
         imageName: a.imageName,
@@ -161,9 +166,12 @@ export async function getDay(
     readOnlyReason: dayReadOnlyReason(date),
     students: session.statuses.map((s) => ({
       enrollmentId: s.enrollmentId,
+      reviewOnly: s.reviewOnly,
       suggestions: {
         memorization:
-          s.outcome === "ABSENT" || s.memorizationResult === "NOT_MASTERED"
+          s.reviewOnly ||
+          s.outcome === "ABSENT" ||
+          s.memorizationResult === "NOT_MASTERED"
             ? null
             : suggestAssignment(
                 histories.get(s.enrollmentId) ?? [],
@@ -196,11 +204,13 @@ export async function getDay(
         s.enrollment.assignments.find(
           (a) => a.dueDate.toISOString().slice(0, 10) === date,
         ),
+        s.reviewOnly,
       ),
       tomorrow: assignmentView(
         s.enrollment.assignments.find(
           (a) => a.dueDate.toISOString().slice(0, 10) === nextDay(date),
         ),
+        s.reviewOnly,
       ),
     })),
   };
@@ -242,6 +252,7 @@ export async function mutateDay(
         (s) =>
           reportIssues({
             enrollmentId: s.enrollmentId,
+            reviewOnly: s.reviewOnly,
             name: s.enrollment.student.name,
             outcome: s.outcome,
             memorizationResult: s.memorizationResult,
@@ -272,12 +283,43 @@ export async function mutateDay(
       include: { entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
     });
     if (!status) throw new HttpError(404, "الطالب غير موجود في هذه الحلقة");
+    if (m.action === "track") {
+      if (
+        status.entries.length ||
+        status.outcome ||
+        status.memorizationResult ||
+        status.reviewResult
+      )
+        throw new HttpError(
+          409,
+          "حدد مسار الطالب قبل بدء تسجيل اليوم؛ لا يمكن تغييره بعد التسجيل",
+        );
+      await tx.enrollment.update({
+        where: { id: status.enrollmentId },
+        data: { reviewOnly: m.reviewOnly },
+      });
+      await tx.dailyStudentStatus.update({
+        where: { id: status.id },
+        data: { reviewOnly: m.reviewOnly },
+      });
+    }
+    if (
+      status.reviewOnly &&
+      (((m.action === "entry" || m.action === "assessment") &&
+        m.kind === "MEMORIZATION") ||
+        (m.action === "assignment" && m.memorization !== null))
+    )
+      throw new HttpError(409, "الطالب حافظ؛ مساره مراجعة فقط دون حفظ جديد");
+    if (status.reviewOnly && m.action === "assignment" && !m.review)
+      throw new HttpError(409, "حدد مدى المراجعة لواجب الغد");
     if (m.action === "edit-entry") {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل تعديل التسميع");
       const entry = status.entries.find((e) => e.id === m.entryId);
       if (!entry)
         throw new HttpError(404, "التسميع غير موجود لهذا الطالب في هذا اليوم");
+      if (status.reviewOnly && entry.kind === "MEMORIZATION")
+        throw new HttpError(409, "الطالب حافظ؛ مساره مراجعة فقط دون حفظ جديد");
       const pages = pageAmount(m.range)!;
       await tx.recitationEntry.update({
         where: { id: entry.id },
@@ -358,7 +400,7 @@ export async function mutateDay(
         data: {
           memorizationResult: memory,
           reviewResult: review,
-          outcome: independentSummary(memory, review),
+          outcome: independentSummary(memory, review, status.reviewOnly),
         },
       });
     }
@@ -470,7 +512,12 @@ export async function mutateDay(
             },
           },
         });
-        if (today && (today.memorization || today.review))
+        if (
+          today &&
+          (status.reviewOnly
+            ? today.review
+            : today.memorization || today.review)
+        )
           await tx.assignment.upsert({
             where: {
               enrollmentId_dueDate: {
@@ -482,7 +529,9 @@ export async function mutateDay(
             create: {
               enrollmentId: m.enrollmentId,
               dueDate: dayDate(nextDay(m.date)),
-              memorization: today.memorization ?? Prisma.DbNull,
+              memorization: status.reviewOnly
+                ? Prisma.DbNull
+                : (today.memorization ?? Prisma.DbNull),
               review: today.review ?? Prisma.DbNull,
               note: today.note,
               imageName: today.imageName,

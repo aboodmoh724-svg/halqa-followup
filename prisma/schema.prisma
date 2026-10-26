@@ -55,6 +55,7 @@ model Enrollment {
   student Student @relation(fields: [studentId], references: [id])
   halqa Halqa @relation(fields: [halqaId], references: [id])
   active Boolean @default(true)
+  reviewOnly Boolean @default(false)
   position Int @default(0)
   dailyStatuses DailyStudentStatus[]
   assignments Assignment[]
@@ -80,6 +81,8 @@ model DailyStudentStatus {
   session DailySession @relation(fields: [sessionId, halqaId], references: [id, halqaId])
   enrollment Enrollment @relation(fields: [enrollmentId, halqaId], references: [id, halqaId])
   outcome Outcome?
+  // Snapshot the study track so later enrollment changes do not rewrite history.
+  reviewOnly Boolean @default(false)
   memorizationResult String?
   reviewResult String?
   note String @default("")
