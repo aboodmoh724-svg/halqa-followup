@@ -79,7 +79,6 @@ try {
     () => document.querySelector("[aria-pressed=true]")?.textContent === "حفظ",
   );
   await page.getByRole("button", { name: "+ واجب الغد", exact: true }).click();
-  await dialog.getByLabel("اسم الصورة (نص فقط)").fill("17");
   await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
   await page

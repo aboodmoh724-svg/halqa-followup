@@ -46,9 +46,10 @@ test("reverse ranges, fractions and invalid chapters rejected", () => {
   ])
     assert.equal(rangeSchema.safeParse(range).success, false);
 });
-test("no fabricated pages; verified map is versioned", () => {
+test("layout-derived pages are versioned and custom maps still work", () => {
   const r = { startSurah: 67, startAyah: 29, endSurah: 68, endAyah: 3 };
-  assert.equal(pageAmount(r), null);
+  assert.ok(pageAmount(r)!.amount > 0);
+  assert.match(pageAmount(r)!.version, /^madani-604-glyph-lines-v1-/);
   assert.deepEqual(
     pageAmount(r, {
       edition: "madani-604",
