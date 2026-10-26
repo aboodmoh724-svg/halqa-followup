@@ -1,0 +1,469 @@
+/* Compact, quiet surfaces for a teacher working on a phone. */
+.shell {
+  max-width: 560px;
+  padding: 18px 18px 32px;
+}
+.shell:not(.login) {
+  background: var(--paper);
+}
+.header {
+  padding: 8px 0 16px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+.header h1 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+}
+.header .subtle {
+  font-size: 12px;
+}
+.login-welcome {
+  max-width: 460px;
+  padding: 26px 22px;
+  gap: 22px;
+  justify-content: center;
+}
+.login-welcome::before {
+  background: linear-gradient(160deg, #edf4ee, #f6f5f1 48%, #f6f2e9);
+}
+.login-intro .mark {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  transform: none;
+  box-shadow: none;
+  background: #e6efe9;
+}
+.login-intro h1 {
+  font-size: 27px;
+}
+.login-intro .small-space {
+  margin-top: 4px;
+}
+.login-panel {
+  padding: 22px;
+  border-top-width: 1px;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px #17324d06;
+}
+.login-help {
+  margin-bottom: 16px;
+}
+.login-panel .stack {
+  gap: 12px;
+}
+.login-panel .code {
+  min-height: 58px;
+  border-color: #c7d7cf;
+  background: #fff;
+}
+.login-panel .primary {
+  min-height: 50px;
+  box-shadow: none;
+}
+.login-panel .subtle {
+  margin-top: 14px;
+}
+.login-footer {
+  font-size: 11px;
+}
+.card,
+.student-row,
+.entry,
+.actions .action {
+  box-shadow: none;
+}
+.card {
+  padding: 16px;
+}
+.teacher-guide {
+  padding: 10px 14px;
+  font-size: 12px;
+}
+.report-shortcut {
+  padding: 12px 16px;
+}
+.student-row {
+  padding: 15px 12px;
+  border-radius: 14px;
+  background: #fff;
+}
+.student-row .name {
+  font-size: 15px;
+}
+.student-row .subtle {
+  font-size: 11px;
+}
+.student-filters,
+.student-panel-tabs,
+.history-tabs {
+  display: flex;
+  gap: 5px;
+  padding: 4px;
+  background: #eaece6;
+  border-radius: 13px;
+  margin: 14px 0;
+}
+.student-filters button,
+.student-panel-tabs button,
+.history-tabs button {
+  flex: 1;
+  min-height: 42px;
+  padding: 8px 5px;
+  background: transparent;
+  color: #52665d;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.student-filters button[aria-pressed="true"],
+.student-panel-tabs button[aria-pressed="true"],
+.history-tabs button[aria-pressed="true"] {
+  background: #fff;
+  color: #165e53;
+  font-weight: 700;
+  box-shadow: 0 2px 6px #17324d08;
+}
+.student-panel-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-bottom: 20px;
+}
+.student-panel-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.assignment-today {
+  padding: 14px 16px;
+  border-radius: 14px;
+  box-shadow: none;
+  background: #faf6ed;
+}
+.assignment-today p {
+  font-size: 13px;
+}
+.section-heading {
+  font-size: 17px;
+  margin: 20px 0 12px;
+}
+.actions {
+  gap: 8px;
+}
+.actions .action {
+  min-height: 80px;
+  border-radius: 14px;
+  gap: 7px;
+  font-size: 12px;
+}
+.assessment-tile {
+  min-height: 110px;
+  border-radius: 14px;
+  gap: 6px;
+}
+.assessment-tile small {
+  font-size: 11px;
+}
+.assessment-summary {
+  margin-top: 18px;
+}
+.student-history {
+  padding-bottom: 20px;
+}
+.history-heading,
+.history-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 14px;
+}
+.history-heading h2 {
+  font-size: 23px;
+}
+.history-heading > svg {
+  color: #749487;
+}
+.eyebrow {
+  color: #62766b;
+  font-size: 11px;
+  font-weight: 600;
+}
+.record-position {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  background: #e8f0e9;
+  border: 1px solid #d5e1d6;
+  border-radius: 16px;
+  margin: 18px 0 12px;
+}
+.record-position h3 {
+  font-size: 16px;
+  margin: 5px 0;
+}
+.record-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: #fff9;
+  color: #347460;
+  border-radius: 12px;
+}
+.record-homework {
+  padding: 16px;
+  border: 1px solid #e6dfd0;
+  background: #faf6ed;
+  border-radius: 14px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.record-homework h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  margin-bottom: 5px;
+}
+.record-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 20px;
+  background: white;
+  border: 1px solid #dfe5dd;
+  border-radius: 16px;
+  padding: 16px 0;
+}
+.record-stats div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-inline-start: 1px solid #e8ece6;
+}
+.record-stats div:first-child {
+  border: 0;
+}
+.record-stats strong {
+  font-size: 27px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.record-stats span {
+  font-size: 12px;
+  color: #5c6f64;
+}
+.record-stats div:first-child strong {
+  color: #226d56;
+}
+.record-stats div:nth-child(2) strong {
+  color: #925f37;
+}
+.record-caption {
+  color: #6b766f;
+  font-size: 11px;
+  line-height: 1.9;
+  margin: 10px 0;
+}
+.record-totals {
+  margin: 18px 0;
+  padding: 16px;
+  border-top: 1px solid #dce3db;
+  border-bottom: 1px solid #dce3db;
+}
+.record-totals h3 {
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+.record-totals > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+}
+.record-totals > div > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.record-totals strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.record-totals small {
+  font-size: 11px;
+  font-weight: 400;
+}
+.record-totals .subtle {
+  font-size: 11px;
+  margin-top: 8px;
+}
+.history-section-title h3 {
+  font-size: 17px;
+}
+.record-day {
+  margin-bottom: 10px;
+  border: 1px solid #dfe5dc;
+  background: white;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.record-day > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  gap: 10px;
+}
+.record-day > summary::-webkit-details-marker {
+  display: none;
+}
+.record-day > summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.record-day > summary strong {
+  font-size: 13px;
+}
+.record-day > summary .subtle {
+  font-size: 11px;
+}
+.record-day > summary:after {
+  content: "+";
+  color: #789183;
+  font-size: 20px;
+}
+.record-day[open] > summary:after {
+  content: "−";
+}
+.record-day-body {
+  padding: 0 15px 15px;
+  border-top: 1px solid #edf0eb;
+}
+.record-day-body > .subtle {
+  margin: 10px 0;
+  font-size: 11px;
+}
+.record-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  font-size: 12px;
+  padding: 10px 0;
+}
+.record-entry {
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0eb;
+  font-size: 13px;
+}
+.record-entry .subtle {
+  font-size: 11px;
+}
+.record-note {
+  background: #fff5da;
+  border-inline-start: 3px solid #b78b3a;
+  padding: 10px;
+  border-radius: 7px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 8px 0;
+}
+.history-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 32px 15px;
+  color: #687b6d;
+  font-size: 13px;
+}
+.history-empty h3 {
+  font-size: 17px;
+}
+.week-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  gap: 8px;
+}
+.week-picker div {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  font-size: 12px;
+}
+.week-picker button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #dce4da;
+  border-radius: 12px;
+  background: white;
+  color: #306c57;
+}
+.history-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0;
+}
+.history-filters label {
+  min-width: 0;
+  font-size: 12px;
+}
+.history-filters input,
+.history-filters select {
+  width: 100%;
+  min-width: 0;
+  font-size: 13px;
+  margin-top: 5px;
+}
+.full-width {
+  grid-column: 1/-1;
+}
+@media (max-width: 360px) {
+  .shell {
+    padding-inline: 14px;
+  }
+  .login-welcome {
+    gap: 16px;
+    padding-top: 18px;
+  }
+  .login-intro .mark {
+    width: 42px;
+    height: 42px;
+    margin-bottom: 8px;
+  }
+  .login-intro h1 {
+    font-size: 24px;
+  }
+  .login-panel {
+    padding: 18px;
+  }
+  .record-day .badge {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
