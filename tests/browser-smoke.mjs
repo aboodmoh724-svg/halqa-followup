@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 if (
@@ -110,6 +111,82 @@ try {
     });
     await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
     await page.getByRole("button", { name: /محمد أحمد علي/ }).click();
+    // Real history in the disposable DB: five page-sized memorization days.
+    const { PrismaClient: HistoryClient } = await import("@prisma/client");
+    const historyDb = new HistoryClient();
+    const ranges = [
+      [1, 5],
+      [6, 16],
+      [17, 24],
+      [25, 29],
+      [30, 37],
+    ];
+    try {
+      for (let i = 0; i < 5; i++) {
+        const historyDate = new Date(`${scheduleDay.date}T00:00:00Z`);
+        historyDate.setUTCDate(historyDate.getUTCDate() - 5 + i);
+        const session = await historyDb.dailySession.create({
+          data: {
+            halqaId: scheduleDay.halqaId,
+            date: historyDate,
+            closedAt: historyDate,
+          },
+        });
+        await historyDb.dailyStudentStatus.create({
+          data: {
+            sessionId: session.id,
+            halqaId: scheduleDay.halqaId,
+            enrollmentId: scheduleDay.students[0].enrollmentId,
+            outcome: "MEMORIZED",
+            memorizationResult: "MASTERED",
+            reviewResult: "MASTERED",
+            entries: {
+              create: {
+                kind: "MEMORIZATION",
+                assessment: "MASTERED",
+                startSurah: 2,
+                endSurah: 2,
+                startAyah: ranges[i][0],
+                endAyah: ranges[i][1],
+                requestKey: randomUUID(),
+              },
+            },
+          },
+        });
+      }
+    } finally {
+      await historyDb.$disconnect();
+    }
+    await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
+    await page
+      .getByRole("button", { name: "تحديث اليوم", exact: true })
+      .click();
+    await page.locator('main[aria-busy="false"]').waitFor();
+    await page.getByRole("button", { name: /محمد أحمد علي/ }).click();
+    await page
+      .getByRole("button", { name: "+ واجب الغد", exact: true })
+      .click();
+    const proposalDialog = page.getByRole("dialog");
+    await proposalDialog
+      .getByRole("button", { name: "استخدام اقتراح الحفظ", exact: true })
+      .click();
+    assert.equal(
+      await proposalDialog
+        .getByRole("group", { name: "مدى الحفظ", exact: true })
+        .getByRole("spinbutton")
+        .first()
+        .inputValue(),
+      "38",
+    );
+    await page.screenshot({ path: "work/smoke/assignment-suggestion.png" });
+    await proposalDialog
+      .getByRole("button", { name: "إغلاق", exact: true })
+      .click();
+    const untouched = await (
+      await context.request.get(`${base}/api/halqas/${scheduleDay.halqaId}`)
+    ).json();
+    assert.equal(untouched.students[0].entries.length, 0);
+    assert.equal(untouched.students[0].tomorrow, null);
     await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
     const dialog = page.getByRole("dialog");
     assert.equal(
@@ -183,6 +260,7 @@ try {
     assert.equal(day.students[0].reviewResult, "NOT_MASTERED");
     assert.equal(day.students[0].entries.length, 3);
     assert.equal(day.students[0].entries[2].assessment, "NOT_MASTERED");
+    await page.getByText("سجل التسميع اليوم (3)", { exact: true }).click();
     await page
       .getByRole("button", { name: "تعديل التسميع", exact: true })
       .first()
@@ -263,14 +341,14 @@ try {
     assert.equal(corrected.students[0].entries.length, 3);
     assert.deepEqual(corrected.students[0].tomorrow.memorization, {
       startSurah: 67,
-      startAyah: 18,
+      startAyah: 10,
       endSurah: 67,
       endAyah: 20,
     });
     await page
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
-    await dialog.getByText(/تم إضافته تلقائيًا/).waitFor();
+    await dialog.getByText(/أبقينا واجب الغد/).waitFor();
     await page.screenshot({ path: "work/smoke/automatic-assignment.png" });
     await dialog
       .getByRole("group", { name: "مدى الحفظ" })
@@ -365,7 +443,7 @@ try {
     assert.equal(await dialog.getByLabel("سمّع الطالب آيات اليوم").count(), 0);
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
     await dialog
-      .getByRole("button", { name: "حفظ التسجيل", exact: true })
+      .getByRole("button", { name: "غير حافظ — دون تسميع", exact: true })
       .click();
     await dialog.waitFor({ state: "hidden" });
     await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
@@ -375,7 +453,7 @@ try {
       .click();
     await dialog.waitFor({ state: "hidden" });
     const after = await (await context.request.get(url)).json();
-    assert.equal(after.students[1].entries.length, 2);
+    assert.equal(after.students[1].entries.length, 1);
     assert.equal(after.students[1].memorizationResult, "NOT_MASTERED");
     assert.equal(after.students[1].reviewResult, "MASTERED");
     await page.screenshot({

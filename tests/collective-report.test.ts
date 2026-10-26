@@ -64,9 +64,9 @@ test("collective report has one page and all 19 rows, duties, independent final 
   assert.equal((html.match(/class="page"/g) || []).length, 1);
   assert.equal((html.match(/data-student=/g) || []).length, 19);
   for (const s of students) assert.ok(html.includes(s.name));
-  assert.match(html, /المطلوب اليوم/);
+  assert.doesNotMatch(html, /المطلوب اليوم/);
   assert.match(html, /واجب الغد/);
-  assert.match(html, /ملاحظة واجب اليوم/);
+  assert.doesNotMatch(html, /ملاحظة واجب اليوم/);
   assert.match(html, /ملاحظة واجب الغد/);
   assert.match(html, /&lt;script&gt;/);
   assert.doesNotMatch(html, /<script>/);

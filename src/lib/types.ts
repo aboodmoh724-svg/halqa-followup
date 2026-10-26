@@ -39,6 +39,10 @@ export type EntryView = QuranRange & {
   pageMappingVersion: string | null;
 };
 export type StudentView = {
+  suggestions?: {
+    memorization: AssignmentSuggestion | null;
+    review: AssignmentSuggestion | null;
+  };
   memorizationResult?: string | null;
   reviewResult?: string | null;
   enrollmentId: string;
@@ -48,6 +52,11 @@ export type StudentView = {
   entries: EntryView[];
   today: AssignmentView | null;
   tomorrow: AssignmentView | null;
+};
+export type AssignmentSuggestion = {
+  range: QuranRange;
+  sampleDays: number;
+  averagePages: number;
 };
 export type DayView = {
   halqaId: string;
@@ -60,6 +69,12 @@ export type DayView = {
   students: StudentView[];
 };
 export const mutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("note"),
+    enrollmentId: z.string().min(1),
+    date: z.string(),
+    note: z.string().max(500),
+  }),
   z.object({
     action: z.literal("edit-entry"),
     enrollmentId: z.string().min(1),
@@ -126,9 +141,15 @@ export function reportIssues(
       !["MASTERED", "NOT_MASTERED"].includes(student.reviewResult)
     )
       issues.push("نتيجة المراجعة");
-    if (!student.entries.some((e) => e.kind === "MEMORIZATION"))
+    if (
+      student.memorizationResult === "MASTERED" &&
+      !student.entries.some((e) => e.kind === "MEMORIZATION")
+    )
       issues.push("مدى الحفظ الجديد");
-    if (!student.entries.some((e) => e.kind === "REVIEW"))
+    if (
+      student.reviewResult === "MASTERED" &&
+      !student.entries.some((e) => e.kind === "REVIEW")
+    )
       issues.push("مدى المراجعة");
   }
   if (!student.tomorrow?.memorization && !student.tomorrow?.review)
