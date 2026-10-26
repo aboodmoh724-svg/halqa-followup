@@ -70,8 +70,8 @@ test("collective report has one page and all 19 rows, duties, independent final 
   assert.match(html, /ملاحظة واجب الغد/);
   assert.match(html, /&lt;script&gt;/);
   assert.doesNotMatch(html, /<script>/);
-  assert.match(html, /class="result mastered">حافظ/);
-  assert.match(html, /class="result not-mastered">غير حافظ/);
+  assert.match(html, /class="result mastered" data-label="حافظ"/);
+  assert.match(html, /class="result not-mastered" data-label="غير حافظ"/);
 });
 test("repeated ranges are labelled without losing page totals; absent rows are clear", () => {
   const repeated = {
@@ -87,7 +87,7 @@ test("repeated ranges are labelled without losing page totals; absent rows are c
   const html = reportMarkup(day, [repeated, absent], "");
   assert.match(html, /2 تسميعات/);
   assert.match(html, /2 صفحة/);
-  assert.match(html, /class="result absent">غائب/);
+  assert.match(html, /class="result absent" data-label="غائب"/);
   assert.match(html, /لم يحضر/);
 });
 test("individual reports retain their detailed layout and a one-student class can use the collective layout", () => {
