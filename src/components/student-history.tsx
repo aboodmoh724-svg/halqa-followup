@@ -232,28 +232,46 @@ export default function StudentHistory({
         <>
           {tab === "overview" && (
             <>
-              <article className="record-position">
-                <div className="record-icon">
-                  <BookOpen size={22} aria-hidden="true" />
-                </div>
-                <div>
-                  <p className="eyebrow">آخر تسميع مسجل</p>
-                  {data.latest ? (
-                    <>
-                      <h3>{rangeText(data.latest.entry)}</h3>
-                      <p className="subtle">
-                        {data.latest.entry.kind === "MEMORIZATION"
-                          ? "حفظ جديد"
-                          : "مراجعة"}{" "}
-                        · {dateLabel(data.latest.date)} ·{" "}
-                        {result(data.latest.entry.assessment || null)}
+              {(data.reviewOnly
+                ? (["REVIEW"] as const)
+                : (["MEMORIZATION", "REVIEW"] as const)
+              ).map((kind) => {
+                const latest =
+                  kind === "MEMORIZATION"
+                    ? data.latestMemorization
+                    : data.latestReview;
+                return (
+                  <article className="record-position" key={kind}>
+                    <div className="record-icon">
+                      {kind === "MEMORIZATION" ? (
+                        <BookOpen size={22} aria-hidden="true" />
+                      ) : (
+                        <RotateCcw size={22} aria-hidden="true" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="eyebrow">
+                        {kind === "MEMORIZATION"
+                          ? "آخر حفظ جديد مسجل"
+                          : "آخر مراجعة مسجلة"}
                       </p>
-                    </>
-                  ) : (
-                    <p>لم يُسجل تسميع لهذا الطالب بعد.</p>
-                  )}
-                </div>
-              </article>
+                      {latest ? (
+                        <>
+                          <h3>{rangeText(latest.entry)}</h3>
+                          <p className="subtle">
+                            {dateLabel(latest.date)} ·{" "}
+                            {result(latest.entry.assessment || null)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="subtle">
+                          لم يسجل تسميع من هذا النوع بعد.
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
               <article className="record-homework">
                 <h3>
                   <CalendarDays size={18} aria-hidden="true" /> الواجب القادم

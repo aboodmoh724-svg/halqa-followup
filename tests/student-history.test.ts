@@ -58,6 +58,16 @@ test(
             note: i === 0 ? "ملاحظة دون نتيجة" : "",
           },
         });
+        if (i === 3)
+          await db.recitationEntry.create({
+            data: {
+              dailyStatusId: status.id,
+              kind: "REVIEW",
+              assessment: "MASTERED",
+              ...range,
+              requestKey: randomUUID(),
+            },
+          });
         if (i === 2) {
           for (const assessment of ["MASTERED", "NOT_MASTERED"]) {
             await db.recitationEntry.create({
@@ -123,6 +133,11 @@ test(
         null,
       );
       assert.equal(result.latest?.entry.kind, "MEMORIZATION");
+      assert.equal(result.latest?.date, shift(2).toISOString().slice(0, 10));
+      assert.equal(
+        result.latestReview?.date,
+        shift(3).toISOString().slice(0, 10),
+      );
       assert.equal(result.upcoming?.memorization, null);
       const second = await getStudentHistory(
         teacher.id,
@@ -146,7 +161,10 @@ test(
         },
       );
       assert.equal(week.summary.recordedDays, 7);
-      assert(week.days.every((d) => !d.entries.length));
+      assert.equal(week.days.flatMap((d) => d.entries).length, 1);
+      assert(
+        week.days.flatMap((d) => d.entries).every((e) => e.kind === "REVIEW"),
+      );
       await assert.rejects(
         getStudentHistory(randomUUID(), halqa.id, enrollment.id, {}),
         /الطالب غير موجود/,

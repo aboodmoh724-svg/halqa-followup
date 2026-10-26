@@ -51,6 +51,8 @@ export type StudentHistory = {
     masteredReviewPages: number;
   };
   latest: { date: string; entry: EntryView } | null;
+  latestMemorization: { date: string; entry: EntryView } | null;
+  latestReview: { date: string; entry: EntryView } | null;
   upcoming: (AssignmentView & { dueDate: string }) | null;
   days: HistoryDay[];
   nextBefore: string | null;
@@ -144,19 +146,37 @@ export async function getStudentHistory(
     where: { enrollmentId, dueDate: { gt: dayDate(dayKey()) } },
     orderBy: { dueDate: "asc" },
   });
-  const latest = await db.recitationEntry.findFirst({
-    where: {
-      dailyStatus: {
-        enrollmentId,
-        halqaId,
-        session: { date: { lte: dayDate(dayKey()) } },
+  const latestOf = (kind?: EntryView["kind"]) =>
+    db.recitationEntry.findFirst({
+      where: {
+        ...(kind ? { kind } : {}),
+        dailyStatus: {
+          enrollmentId,
+          halqaId,
+          session: { date: { lte: dayDate(dayKey()) } },
+        },
       },
-    },
-    include: {
-      dailyStatus: { select: { session: { select: { date: true } } } },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-  });
+      include: {
+        dailyStatus: { select: { session: { select: { date: true } } } },
+      },
+      orderBy: [
+        { dailyStatus: { session: { date: "desc" } } },
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+    });
+  const [latest, latestMemorization, latestReview] = await Promise.all([
+    latestOf(),
+    latestOf("MEMORIZATION"),
+    latestOf("REVIEW"),
+  ]);
+  const lastView = (entry: typeof latest) =>
+    entry
+      ? {
+          date: entry.dailyStatus.session.date.toISOString().slice(0, 10),
+          entry: viewEntry(entry),
+        }
+      : null;
   return {
     studentName: enrollment.student.name,
     halqaName: enrollment.halqa.name,
@@ -173,12 +193,9 @@ export async function getStudentHistory(
       masteredMemorizationPages: amount("MEMORIZATION", true),
       masteredReviewPages: amount("REVIEW", true),
     },
-    latest: latest
-      ? {
-          date: latest.dailyStatus.session.date.toISOString().slice(0, 10),
-          entry: viewEntry(latest),
-        }
-      : null,
+    latest: lastView(latest),
+    latestMemorization: lastView(latestMemorization),
+    latestReview: lastView(latestReview),
     upcoming: upcoming
       ? {
           ...assignmentView(upcoming, enrollment.reviewOnly),
