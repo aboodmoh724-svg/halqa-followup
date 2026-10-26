@@ -141,7 +141,7 @@ export async function getStudentHistory(
     imageName: a.imageName,
   });
   const upcoming = await db.assignment.findFirst({
-    where: { enrollmentId, dueDate: { gte: dayDate(dayKey()) } },
+    where: { enrollmentId, dueDate: { gt: dayDate(dayKey()) } },
     orderBy: { dueDate: "asc" },
   });
   const latest = await db.recitationEntry.findFirst({

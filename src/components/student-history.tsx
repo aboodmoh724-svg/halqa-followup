@@ -129,6 +129,7 @@ export default function StudentHistory({
             key={value}
             aria-pressed={tab === value}
             onClick={() => {
+              if (tab === value) return;
               reset();
               setTab(value);
             }}
