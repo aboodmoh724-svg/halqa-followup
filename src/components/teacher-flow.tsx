@@ -374,48 +374,6 @@ export default function TeacherFlow() {
           {student.reviewOnly && (
             <p className="notice">طالب حافظ · مراجعة فقط</p>
           )}
-          {!locked &&
-            !student.entries.length &&
-            !student.outcome &&
-            !student.memorizationResult &&
-            !student.reviewResult && (
-              <details className="card small-space">
-                <summary>مسار الطالب</summary>
-                <p className="subtle">
-                  يُحدد قبل بدء التسجيل. لا يغير التقارير السابقة.
-                </p>
-                <div className="assessment-options">
-                  <button
-                    className="secondary"
-                    disabled={busy || !student.reviewOnly}
-                    aria-pressed={!student.reviewOnly}
-                    onClick={() =>
-                      save({
-                        action: "track",
-                        enrollmentId: student.enrollmentId,
-                        reviewOnly: false,
-                      })
-                    }
-                  >
-                    حفظ ومراجعة
-                  </button>
-                  <button
-                    className="secondary"
-                    disabled={busy || !!student.reviewOnly}
-                    aria-pressed={!!student.reviewOnly}
-                    onClick={() =>
-                      save({
-                        action: "track",
-                        enrollmentId: student.enrollmentId,
-                        reviewOnly: true,
-                      })
-                    }
-                  >
-                    حافظ · مراجعة فقط
-                  </button>
-                </div>
-              </details>
-            )}
           {locked && (
             <p className="notice closed small-space">
               {day.readOnlyReason || "تم إنهاء الحلقة لهذا اليوم"}

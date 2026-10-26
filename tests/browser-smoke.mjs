@@ -32,6 +32,20 @@ try {
     ).status(),
     403,
   );
+  // The school provisions fixed tracks; the teacher has no track mutation UI/API.
+  const { PrismaClient: TrackFixtureClient } = await import("@prisma/client");
+  const trackFixtures = new TrackFixtureClient();
+  try {
+    await trackFixtures.enrollment.updateMany({
+      where: {
+        halqaId: "seed-halqa",
+        studentId: { in: ["seed-student-3", "seed-student-5"] },
+      },
+      data: { reviewOnly: true },
+    });
+  } finally {
+    await trackFixtures.$disconnect();
+  }
   await page.goto(base);
   await page.getByLabel("رمز المعلم", { exact: true }).waitFor();
   await page.screenshot({ path: "work/smoke/login.png" });
@@ -468,11 +482,16 @@ try {
     await page
       .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
       .click();
-    await page.getByText("مسار الطالب", { exact: true }).click();
-    await page
-      .getByRole("button", { name: "حافظ · مراجعة فقط", exact: true })
-      .click();
-    await page.locator('main[aria-busy="false"]').waitFor();
+    assert.equal(
+      await page.getByText("مسار الطالب", { exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await page
+        .getByRole("button", { name: "حافظ · مراجعة فقط", exact: true })
+        .count(),
+      0,
+    );
     assert.equal(
       await page
         .getByRole("button", { name: "+ حفظ جديد", exact: true })
@@ -487,6 +506,20 @@ try {
     await dialog.waitFor({ state: "hidden" });
     const hafizDay = await (await context.request.get(url)).json();
     assert.equal(hafizDay.students[3].reviewOnly, true);
+    assert.equal(
+      (
+        await context.request.post(url, {
+          data: {
+            action: "track",
+            date: day.date,
+            enrollmentId: day.students[3].enrollmentId,
+            reviewOnly: false,
+          },
+          headers: { origin: base },
+        })
+      ).status(),
+      400,
+    );
     assert.equal(hafizDay.students[3].memorizationResult, null);
     assert.equal(hafizDay.students[3].reviewResult, "MASTERED");
     assert.equal(hafizDay.students[3].outcome, "MEMORIZED");
@@ -535,11 +568,16 @@ try {
     await page
       .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
       .click();
-    await page.getByText("مسار الطالب", { exact: true }).click();
-    await page
-      .getByRole("button", { name: "حافظ · مراجعة فقط", exact: true })
-      .click();
-    await page.locator('main[aria-busy="false"]').waitFor();
+    assert.equal(
+      await page.getByText("مسار الطالب", { exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await page
+        .getByRole("button", { name: "حافظ · مراجعة فقط", exact: true })
+        .count(),
+      0,
+    );
     await page.getByRole("button", { name: "غائب اليوم", exact: true }).click();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await page

@@ -283,26 +283,6 @@ export async function mutateDay(
       include: { entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
     });
     if (!status) throw new HttpError(404, "الطالب غير موجود في هذه الحلقة");
-    if (m.action === "track") {
-      if (
-        status.entries.length ||
-        status.outcome ||
-        status.memorizationResult ||
-        status.reviewResult
-      )
-        throw new HttpError(
-          409,
-          "حدد مسار الطالب قبل بدء تسجيل اليوم؛ لا يمكن تغييره بعد التسجيل",
-        );
-      await tx.enrollment.update({
-        where: { id: status.enrollmentId },
-        data: { reviewOnly: m.reviewOnly },
-      });
-      await tx.dailyStudentStatus.update({
-        where: { id: status.id },
-        data: { reviewOnly: m.reviewOnly },
-      });
-    }
     if (
       status.reviewOnly &&
       (((m.action === "entry" || m.action === "assessment") &&

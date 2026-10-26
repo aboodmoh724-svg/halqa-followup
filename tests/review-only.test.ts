@@ -133,10 +133,20 @@ test(
       assert.equal((await read()).reviewOnly, true);
       assert.equal((await read()).today?.memorization, null);
       assert.deepEqual((await read()).today?.review, range);
-      // Changing the setting before today's first activity is allowed, not after.
-      await post({ action: "track", reviewOnly: false });
-      assert.equal((await read()).reviewOnly, false);
-      await post({ action: "track", reviewOnly: true });
+      // Teacher input cannot change a school-assigned study track.
+      await assert.rejects(() => post({ action: "track", reviewOnly: false }), {
+        name: "ZodError",
+      });
+      await post({ action: "note", note: "ملاحظة", reviewOnly: false });
+      assert.equal((await read()).reviewOnly, true);
+      assert.equal(
+        (
+          await db.enrollment.findUniqueOrThrow({
+            where: { id: enrollment.id },
+          })
+        ).reviewOnly,
+        true,
+      );
       assert.deepEqual(
         (await db.assignment.findUniqueOrThrow({ where: { id: original.id } }))
           .memorization,
@@ -148,7 +158,9 @@ test(
             other.id,
             halqa.id,
             {
-              action: "track",
+              action: "assessment",
+              kind: "REVIEW",
+              assessment: "NOT_MASTERED",
               date,
               enrollmentId: enrollment.id,
               reviewOnly: false,
@@ -205,10 +217,9 @@ test(
       assert.equal(saved.outcome, "NOT_MEMORIZED");
       assert.equal(saved.entries.length, 0);
       assert.deepEqual(reportIssues(saved), []);
-      await assert.rejects(
-        () => post({ action: "track", reviewOnly: false }),
-        /قبل بدء تسجيل/,
-      );
+      await assert.rejects(() => post({ action: "track", reviewOnly: false }), {
+        name: "ZodError",
+      });
       for (let i = 0; i < 2; i++) {
         const entry = {
           action: "entry",
