@@ -194,9 +194,33 @@ test(
       assert.equal(next.entries.length, 0);
       assert.equal(next.outcome, null);
       await post({ action: "close" });
+      await post({ action: "note", note: "تصحيح بعد إنهاء اليوم" });
+      assert.equal((await getDay(teacher.id, halqa.id, date)).closedAt, null);
+      await post({ action: "close" });
       await assert.rejects(
-        () => post({ action: "note", note: "closed" }),
-        /تم إنهاء/,
+        () =>
+          mutateDay(
+            teacher.id,
+            halqa.id,
+            { action: "note", enrollmentId: enrollment.id, date, note: "old" },
+            new Date(`${nextDay(date)}T09:00:00Z`),
+          ),
+        /تغير اليوم/,
+      );
+      await assert.rejects(
+        () =>
+          mutateDay(
+            teacher.id,
+            halqa.id,
+            {
+              action: "note",
+              enrollmentId: enrollment.id,
+              date,
+              note: "midnight",
+            },
+            new Date(`${nextDay(date)}T00:00:00Z`),
+          ),
+        /انتهى وقت/,
       );
     } finally {
       await db.recitationEntry.deleteMany({

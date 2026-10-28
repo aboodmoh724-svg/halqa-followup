@@ -39,10 +39,12 @@ export default function StudentHistory({
   halqaId,
   enrollmentId,
   today,
+  supervisor = false,
 }: {
   halqaId: string;
   enrollmentId: string;
   today: string;
+  supervisor?: boolean;
 }) {
   const [tab, setTab] = useState<"overview" | "week" | "all">("overview");
   const [weekEnd, setWeekEnd] = useState(today);
@@ -68,10 +70,13 @@ export default function StudentHistory({
   const query = params.toString();
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/halqas/${halqaId}/students/${enrollmentId}/history?${query}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
+    fetch(
+      `/api/${supervisor ? "supervisor/" : ""}halqas/${halqaId}/students/${enrollmentId}/history?${query}`,
+      {
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    )
       .then(async (r) => {
         const payload = await r.json();
         if (!r.ok) throw Error(payload.error || "تعذر فتح السجل");
@@ -100,7 +105,7 @@ export default function StudentHistory({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [halqaId, enrollmentId, query, cursor, retry]);
+  }, [halqaId, enrollmentId, query, cursor, retry, supervisor]);
   function reset() {
     setLoading(true);
     setError("");

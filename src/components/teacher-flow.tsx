@@ -331,7 +331,7 @@ export default function TeacherFlow() {
         )}
       </main>
     );
-  const locked = !!day.closedAt || !!day.readOnlyReason;
+  const locked = !!day.readOnlyReason;
   const student = day.students.find((s) => s.enrollmentId === selected);
   const index = day.students.findIndex((s) => s.enrollmentId === selected);
   const completed = day.students.filter(
@@ -807,9 +807,10 @@ export default function TeacherFlow() {
                 ))}
             </div>
           )}
-          {locked ? (
+          {locked || day.closedAt ? (
             <p className="notice closed space">
-              {day.readOnlyReason || "تم إنهاء اليوم وحفظ النتائج"}
+              {day.readOnlyReason ||
+                "تم إنهاء اليوم. يمكنك تصحيح تسجيلات اليوم؛ وعند التعديل يُعاد فتحه لتنهِيه مجددًا."}
             </p>
           ) : (
             <button
@@ -856,7 +857,9 @@ export default function TeacherFlow() {
             </div>
             <p className="subtle small-space">
               {day.readOnlyReason ||
-                (day.closedAt ? "تم إنهاء اليوم" : "اختر الطالب وسجّل تسميعه")}
+                (day.closedAt
+                  ? "تم إنهاء اليوم؛ التصحيح متاح خلال وقت التسجيل"
+                  : "اختر الطالب وسجّل تسميعه")}
             </p>
           </div>
           <div className="space">
