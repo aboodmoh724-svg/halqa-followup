@@ -354,3 +354,76 @@
     padding: 20px;
   }
 }
+
+.supervision-reports form select {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 5px;
+}
+.supervision-date-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.supervision-date-grid input {
+  font-size: 13px;
+  min-width: 0;
+}
+.supervision-criteria {
+  border: 1px solid #dfdfcd;
+  background: #fbfaf5;
+  border-radius: 14px;
+  padding: 14px;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.supervision-criteria legend {
+  font-weight: 700;
+  font-size: 13px;
+}
+.supervision-criteria legend svg {
+  vertical-align: middle;
+}
+.supervision-criteria .subtle {
+  font-size: 12px;
+  margin: 0;
+}
+.supervision-preview {
+  margin-top: 28px;
+}
+.supervision-report-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+}
+.supervision-report-totals > div {
+  padding: 14px;
+  background: #eaf2ee;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.supervision-report-totals strong {
+  font-size: 23px;
+}
+.supervision-report-totals span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.supervision-download {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: white;
+  margin: 16px 0;
+}
+.supervision-reports h3 {
+  font-size: 18px;
+}
+.supervision-preview .subtle {
+  font-size: 12px;
+}

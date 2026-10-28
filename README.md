@@ -69,4 +69,4 @@ TEST_DATABASE_URL="postgresql://.../halqa_test" npm test
 
 ## Supervision
 
-The mobile supervision workspace is at `/supervisor`, with separate accounts and read-only access to classes and student history. Provisioning, alert definitions and same-day teacher corrections are documented in [docs/supervision.md](docs/supervision.md).
+The mobile supervision workspace is at `/` through the shared code login (the old `/supervisor` URL redirects there), with separate accounts and read-only access to classes and student history. Provisioning, alert definitions and same-day teacher corrections are documented in [docs/supervision.md](docs/supervision.md).

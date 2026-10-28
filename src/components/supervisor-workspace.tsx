@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BookOpen,
   CheckCheck,
@@ -12,10 +12,10 @@ import {
   Users,
 } from "lucide-react";
 import { academyName } from "@/lib/branding";
-import { formatPages } from "@/lib/quran";
-import { assessmentLabels, labels, type Assessment } from "@/lib/types";
+import { assessmentLabels, type Assessment } from "@/lib/types";
 import type { SupervisorOverview } from "@/lib/supervisor-service";
 import StudentHistory from "./student-history";
+import SupervisionReports from "./supervision-reports";
 type View = SupervisorOverview & { supervisor: { name: string } };
 const states: Record<string, string> = {
   "not-started": "لم يبدأ التسجيل",
@@ -36,13 +36,10 @@ export default function SupervisorWorkspace() {
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const [username, setUsername] = useState(""),
-    [password, setPassword] = useState("");
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("today"),
     [classId, setClassId] = useState<string | null>(null),
     [studentId, setStudentId] = useState<string | null>(null),
-    [search, setSearch] = useState(""),
-    [period, setPeriod] = useState<"week" | "month">("week");
+    [search, setSearch] = useState("");
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const r = await fetch("/api/supervisor/overview", {
@@ -83,35 +80,15 @@ export default function SupervisorWorkspace() {
       window.removeEventListener("focus", refresh);
     };
   }, [signedIn, load]);
-  async function login(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const r = await fetch("/api/supervisor/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const body = await r.json();
-      if (!r.ok) throw Error(body.error);
-      setPassword("");
-      await load();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   async function logout() {
     setBusy(true);
     try {
-      const r = await fetch("/api/supervisor/logout", { method: "POST" });
+      const r = await fetch("/api/logout", { method: "POST" });
       if (!r.ok) throw Error("تعذر تسجيل الخروج");
       setData(null);
       setClassId(null);
       setStudentId(null);
-      setPassword("");
+      window.location.replace("/");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -138,49 +115,9 @@ export default function SupervisorWorkspace() {
     );
   if (!data)
     return (
-      <main className="supervisor-shell supervisor-login">
-        <div className="supervisor-seal">
-          <ShieldCheck size={30} />
-        </div>
-        <p className="eyebrow">{academyName}</p>
-        <h1>إشراف قسم القرآن</h1>
-        <p className="subtle">متابعة الحلقات والطلاب، من مكان واحد.</p>
-        <form className="stack" onSubmit={login}>
-          <label>
-            اسم المستخدم
-            <input
-              autoComplete="username"
-              dir="ltr"
-              required
-              maxLength={64}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </label>
-          <label>
-            كلمة المرور
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              minLength={12}
-              maxLength={128}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          {error && (
-            <p role="alert" className="notice error">
-              {error}
-            </p>
-          )}
-          <button className="primary" disabled={busy}>
-            {busy ? "جارٍ الدخول…" : "دخول الإشراف"}
-          </button>
-        </form>
-        <a href="/" className="supervisor-teacher-link">
-          دخول المعلمين
-        </a>
+      <main className="supervisor-shell">
+        <p role="alert">{error || "انتهت جلسة الإشراف."}</p>
+        <a href="/">العودة إلى الدخول</a>
       </main>
     );
   const selectedClass = data.classes.find((h) => h.id === classId),
@@ -458,74 +395,11 @@ export default function SupervisorWorkspace() {
             </>
           )}
           {tab === "reports" && (
-            <>
-              <div className="supervisor-heading">
-                <div>
-                  <p className="eyebrow">ملخص النشاط المسجل</p>
-                  <h2>التقارير</h2>
-                </div>
-                <ClipboardList size={25} />
-              </div>
-              <div className="history-tabs">
-                <button
-                  aria-pressed={period === "week"}
-                  onClick={() => setPeriod("week")}
-                >
-                  آخر ٧ أيام
-                </button>
-                <button
-                  aria-pressed={period === "month"}
-                  onClick={() => setPeriod("month")}
-                >
-                  آخر ٣٠ يومًا
-                </button>
-              </div>
-              <p className="subtle">
-                حتى {date}. الكميات مجموع التسميع الفعلي المتكرر، وليست مقدارًا
-                فريدًا معتمدًا للشهادة. النتائج أدناه عدد حالات الطلاب اليومية.
-              </p>
-              <div className="supervisor-list">
-                {data.classes.map((h) => {
-                  const p = h[period];
-                  return (
-                    <section className="supervisor-report" key={h.id}>
-                      <h3>{h.name}</h3>
-                      <p className="subtle">
-                        {h.teacherName} · {p.days} أيام لها سجل
-                      </p>
-                      <dl>
-                        <div>
-                          <dt>الحفظ المسجل</dt>
-                          <dd>{formatPages(p.memoryPages)} صفحة</dd>
-                        </div>
-                        <div>
-                          <dt>المراجعة المسجلة</dt>
-                          <dd>{formatPages(p.reviewPages)} صفحة</dd>
-                        </div>
-                        <div>
-                          <dt>{labels.MEMORIZED}</dt>
-                          <dd>{p.mastered}</dd>
-                        </div>
-                        <div>
-                          <dt>{labels.NOT_MEMORIZED}</dt>
-                          <dd>{p.notMastered}</dd>
-                        </div>
-                        <div>
-                          <dt>الغياب</dt>
-                          <dd>{p.absent}</dd>
-                        </div>
-                      </dl>
-                      <button
-                        className="text-button"
-                        onClick={() => openClass(h.id)}
-                      >
-                        فتح الحلقة ←
-                      </button>
-                    </section>
-                  );
-                })}
-              </div>
-            </>
+            <SupervisionReports
+              today={data.date}
+              classes={data.classes}
+              onStudent={openStudent}
+            />
           )}
         </>
       )}

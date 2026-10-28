@@ -1,4 +1,4 @@
-import TeacherFlow from "@/components/teacher-flow";
+import UnifiedWorkspace from "@/components/unified-workspace";
 export default function Page() {
-  return <TeacherFlow />;
+  return <UnifiedWorkspace />;
 }

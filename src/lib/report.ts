@@ -31,6 +31,17 @@ export async function generateReport(
       409,
       `التقرير غير مكتمل: بقي ${pending.length} طالب. أكمل نتيجتي الحفظ والمراجعة وواجب الغد؛ ولنتيجة حافظ سجل التسميع؛ الغياب لا يتطلب واجبًا سابقًا.`,
     );
+  return generateHtmlPdf(
+    (fontCss) => reportMarkup(day, students, fontCss, collective),
+    true,
+  );
+}
+export async function generateHtmlPdf(
+  markup: (fontCss: string) => string,
+  fitDaily = false,
+) {
+  if (active >= 2)
+    throw new HttpError(503, "توليد التقارير مشغول. حاول بعد قليل");
   active++;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
@@ -52,15 +63,13 @@ export async function generateReport(
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.route("**/*", (route) => route.abort());
-    await page.setContent(
-      reportMarkup(day, students, fonts.join("\n"), collective),
-      {
-        waitUntil: "load",
-        timeout: 15000,
-      },
-    );
-    await page.evaluate(async () => {
+    await page.setContent(markup(fonts.join("\n")), {
+      waitUntil: "load",
+      timeout: 15000,
+    });
+    await page.evaluate(async (fitDaily) => {
       await document.fonts.ready;
+      if (!fitDaily) return;
       if (document.querySelector("table")) {
         const content = document.querySelector<HTMLElement>(".content")!;
         const footer = content.parentElement!.querySelector("footer")!;
@@ -86,11 +95,15 @@ export async function generateReport(
         if (content.scrollHeight > available)
           content.style.transform = `scale(${available / content.scrollHeight})`;
       });
-    });
+    }, fitDaily);
     return await page.pdf({
       format: "A4",
       printBackground: true,
       preferCSSPageSize: true,
+      displayHeaderFooter: !fitDaily,
+      headerTemplate: "<span></span>",
+      footerTemplate:
+        '<div style="width:100%;text-align:center;font:9px Arial;color:#647482"><span class="pageNumber"></span> / <span class="totalPages"></span></div>',
     });
   } finally {
     await browser?.close();

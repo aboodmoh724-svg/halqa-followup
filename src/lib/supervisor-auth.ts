@@ -5,19 +5,10 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
-import { z } from "zod";
 import { db } from "./db";
 import { secret, tokenHash } from "./crypto";
 import { HttpError } from "./auth";
 export const supervisorCookie = "halqa_supervisor";
-export const supervisorLoginSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9._-]{3,64}$/),
-  password: z.string().min(12).max(128),
-});
 function keyed(password: string) {
   return createHmac("sha256", secret())
     .update(`supervisor-password:${password}`)
@@ -44,4 +35,16 @@ export async function requireSupervisor() {
   if (!session || session.expiresAt <= new Date() || !session.supervisor.active)
     throw new HttpError(401, "انتهت جلسة الإشراف؛ سجل الدخول مجددًا");
   return { id: session.supervisor.id, name: session.supervisor.name };
+}
+
+export function supervisorCodeLookup(code: string) {
+  return createHmac("sha256", secret())
+    .update(`supervisor-code:${code}`)
+    .digest("hex");
+}
+export function hashSupervisorCode(code: string) {
+  return hashSupervisorPassword(`code:${code}`);
+}
+export function verifySupervisorCode(code: string, hash: string) {
+  return verifySupervisorPassword(`code:${code}`, hash);
 }

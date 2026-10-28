@@ -47,14 +47,12 @@ try {
     await trackFixtures.$disconnect();
   }
   await page.goto(base);
-  await page.getByLabel("رمز المعلم", { exact: true }).waitFor();
+  await page.getByLabel("رمز الدخول", { exact: true }).waitFor();
   await page.screenshot({ path: "work/smoke/login.png" });
   await page
-    .getByLabel("رمز المعلم", { exact: true })
+    .getByLabel("رمز الدخول", { exact: true })
     .fill(process.env.SEED_TEACHER_CODE);
-  await page
-    .getByRole("button", { name: "الدخول إلى الحلقة", exact: true })
-    .click();
+  await page.getByRole("button", { name: "دخول", exact: true }).click();
   await page.getByRole("button", { name: /محمد أحمد علي/ }).waitFor();
   await page.screenshot({ path: "work/smoke/students.png" });
   const scheduleTeacher = await (

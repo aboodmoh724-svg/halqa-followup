@@ -4,6 +4,12 @@ import { loginSchema } from "@/lib/login-schema";
 import { db } from "@/lib/db";
 import { codeLookup, verifyCode, tokenHash } from "@/lib/crypto";
 import { apiError, checkOrigin, cookieName, HttpError } from "@/lib/auth";
+import {
+  supervisorCodeLookup,
+  supervisorCookie,
+  verifySupervisorCode,
+} from "@/lib/supervisor-auth";
+import { limitSupervisorLogin } from "@/lib/login-rate-limit";
 export const runtime = "nodejs";
 async function bucket(key: string, limit: number) {
   const now = new Date();
@@ -18,6 +24,44 @@ export async function POST(request: Request) {
   try {
     checkOrigin(request);
     const input = loginSchema.parse(await request.json());
+    if (input.code.length === 8) {
+      const lookup = supervisorCodeLookup(input.code);
+      await limitSupervisorLogin(request, lookup);
+      const supervisor = await db.supervisor.findUnique({
+        where: { codeLookup: lookup },
+      });
+      const valid = verifySupervisorCode(
+        input.code,
+        supervisor?.codeHash ?? `${"0".repeat(32)}:${"0".repeat(128)}`,
+      );
+      if (!supervisor?.active || !valid)
+        throw new HttpError(401, "الرمز غير صحيح");
+      const token = randomBytes(32).toString("hex"),
+        seconds = 12 * 3600;
+      await db.supervisorSession.create({
+        data: {
+          id: tokenHash(token),
+          supervisorId: supervisor.id,
+          expiresAt: new Date(Date.now() + seconds * 1000),
+        },
+      });
+      const jar = await cookies();
+      const old = jar.get(cookieName)?.value;
+      if (old)
+        await db.teacherSession.deleteMany({ where: { id: tokenHash(old) } });
+      jar.delete(cookieName);
+      jar.set(supervisorCookie, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        ...(input.remember ? { maxAge: seconds } : {}),
+      });
+      return Response.json(
+        { ok: true, role: "SUPERVISOR" },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     const lookup = codeLookup(input.code);
     const ip =
       process.env.TRUST_PROXY === "true"
@@ -58,7 +102,14 @@ export async function POST(request: Request) {
     await db.teacherSession.deleteMany({
       where: { expiresAt: { lt: new Date() } },
     });
-    (await cookies()).set(cookieName, token, {
+    const jar = await cookies();
+    const supervisorToken = jar.get(supervisorCookie)?.value;
+    if (supervisorToken)
+      await db.supervisorSession.deleteMany({
+        where: { id: tokenHash(supervisorToken) },
+      });
+    jar.delete(supervisorCookie);
+    jar.set(cookieName, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -66,7 +117,7 @@ export async function POST(request: Request) {
       ...(input.remember ? { maxAge: seconds } : {}),
     });
     return Response.json(
-      { ok: true },
+      { ok: true, role: "TEACHER" },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {

@@ -6,7 +6,9 @@ import {
   getSupervisorOverview,
 } from "../src/lib/supervisor-service";
 import {
-  supervisorLoginSchema,
+  hashSupervisorCode,
+  verifySupervisorCode,
+  supervisorCodeLookup,
   hashSupervisorPassword,
   verifySupervisorPassword,
 } from "../src/lib/supervisor-auth";
@@ -20,12 +22,15 @@ test("supervisor password uses a separate salted domain and rejects teacher code
   assert(!a.includes(password));
   assert(verifySupervisorPassword(password, a));
   assert(!verifySupervisorPassword("different-password", a));
-  assert(
-    !supervisorLoginSchema.safeParse({
-      username: "supervisor",
-      password: "1234",
-    }).success,
-  );
+});
+test("supervisor PINs preserve leading zeroes and use a separate lookup domain", async () => {
+  process.env.AUTH_SECRET ||= "test-supervisor-secret-at-least-32-characters";
+  const code = "01234567",
+    hash = hashSupervisorCode(code);
+  assert(verifySupervisorCode(code, hash));
+  assert(!verifySupervisorCode("11234567", hash));
+  const { codeLookup } = await import("../src/lib/crypto");
+  assert.notEqual(supervisorCodeLookup(code), codeLookup(code));
 });
 test("student alerts distinguish three recorded absences and independent results; recovery breaks streak", () => {
   const days = Array.from({ length: 3 }, (_, i) => ({

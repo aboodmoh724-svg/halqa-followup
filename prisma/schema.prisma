@@ -134,6 +134,8 @@ model Assignment {
 
 // Separate identities and sessions prevent teacher codes granting supervisory access.
 model Supervisor {
+  codeLookup String? @unique
+  codeHash String?
   id String @id @default(cuid())
   username String @unique
   name String
