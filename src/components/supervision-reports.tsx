@@ -113,6 +113,9 @@ export default function SupervisionReports({
             <option value="custom">فترة مخصصة</option>
           </select>
         </label>
+        {preset === "custom" && (
+          <p className="subtle">اختر فترة لا تتجاوز ٩٣ يومًا.</p>
+        )}
         <div className="supervision-date-grid">
           <label>
             من تاريخ

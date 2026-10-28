@@ -24,6 +24,14 @@ export async function GET(request: Request) {
     }
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
+    if (e instanceof Error && e.name === "ZodError")
+      return Response.json(
+        {
+          error:
+            "تحقق من نوع التقرير والتواريخ والشروط، واختر فترة لا تتجاوز ٩٣ يومًا.",
+        },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
     return apiError(e);
   }
 }
