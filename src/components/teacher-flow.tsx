@@ -71,6 +71,7 @@ export default function TeacherFlow() {
   const [busy, setBusy] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [code, setCode] = useState("");
+  const [showCode, setShowCode] = useState(false);
   const [remember, setRemember] = useState(true);
   const [studentSearch, setStudentSearch] = useState("");
   const [studentPanel, setStudentPanel] = useState<"today" | "history">(
@@ -178,7 +179,14 @@ export default function TeacherFlow() {
     setBusy(true);
     setLoginError("");
     try {
-      await api("/api/login", { code, remember });
+      const session = await api<{ role: string }>("/api/login", {
+        code,
+        remember,
+      });
+      if (session.role === "SUPERVISOR") {
+        window.location.replace("/");
+        return;
+      }
       setCode("");
       await bootstrap();
     } catch (e) {
@@ -248,19 +256,19 @@ export default function TeacherFlow() {
           </div>
         </div>
         <div className="login-panel">
-          <h2>أهلًا بك، معلمنا</h2>
-          <p className="login-help">أدخل رمزك الخاص لفتح حلقتك.</p>
+          <h2>أهلًا بك</h2>
+          <p className="login-help">أدخل رمزك الخاص لفتح واجهتك.</p>
           <form className="stack" onSubmit={login}>
-            <label htmlFor="code">رمز المعلم</label>
+            <label htmlFor="code">رمز الدخول</label>
             <input
               id="code"
               className="code"
               autoComplete="off"
-              type="text"
+              type={showCode ? "text" : "password"}
               inputMode="numeric"
-              pattern="([0-9]{4}|[0-9]{6})"
+              pattern="([0-9]{4}|[0-9]{6}|[0-9]{8})"
               minLength={4}
-              maxLength={6}
+              maxLength={8}
               required
               dir="ltr"
               placeholder="— — — —"
@@ -274,6 +282,14 @@ export default function TeacherFlow() {
                 )
               }
             />
+            <button
+              type="button"
+              className="text-button"
+              aria-pressed={showCode}
+              onClick={() => setShowCode((value) => !value)}
+            >
+              {showCode ? "إخفاء الرمز" : "إظهار الرمز"}
+            </button>
             <label className="check">
               <input
                 type="checkbox"
@@ -288,7 +304,7 @@ export default function TeacherFlow() {
               </p>
             )}
             <button className="primary" disabled={busy}>
-              {busy ? "جارٍ الدخول…" : "الدخول إلى الحلقة"}
+              {busy ? "جارٍ الدخول…" : "دخول"}
             </button>
           </form>
           <p className="subtle">رمزك خاص بك. لا تشاركه مع الآخرين.</p>

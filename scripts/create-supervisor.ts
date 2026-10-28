@@ -1,34 +1,42 @@
-// Run with environment variables, never password arguments or committed credentials.
+import { randomBytes } from "node:crypto";
 import { db } from "../src/lib/db";
 import {
   hashSupervisorPassword,
-  supervisorLoginSchema,
+  hashSupervisorCode,
+  supervisorCodeLookup,
 } from "../src/lib/supervisor-auth";
 async function main() {
-  const input = supervisorLoginSchema.parse({
-    username: process.env.SUPERVISOR_USERNAME,
-    password: process.env.SUPERVISOR_PASSWORD,
-  });
-  const name = process.env.SUPERVISOR_NAME?.trim();
-  if (!name || name.length > 100)
-    throw Error("SUPERVISOR_NAME is required (max 100)");
+  const username = process.env.SUPERVISOR_USERNAME?.trim().toLowerCase(),
+    code = process.env.SUPERVISOR_CODE,
+    name = process.env.SUPERVISOR_NAME?.trim();
+  if (
+    !username ||
+    !/^[a-z0-9._-]{3,64}$/.test(username) ||
+    !code ||
+    !/^\d{8}$/.test(code) ||
+    !name ||
+    name.length > 100
+  )
+    throw Error("Invalid supervisor configuration");
+  const credential = {
+    codeLookup: supervisorCodeLookup(code),
+    codeHash: hashSupervisorCode(code),
+    name,
+    active: true,
+  };
   await db.$transaction(async (tx) => {
     const user = await tx.supervisor.upsert({
-      where: { username: input.username },
+      where: { username },
       create: {
-        username: input.username,
-        name,
-        passwordHash: hashSupervisorPassword(input.password),
+        username,
+        passwordHash: hashSupervisorPassword(randomBytes(32).toString("hex")),
+        ...credential,
       },
-      update: {
-        name,
-        passwordHash: hashSupervisorPassword(input.password),
-        active: true,
-      },
+      update: credential,
     });
     await tx.supervisorSession.deleteMany({ where: { supervisorId: user.id } });
   });
-  console.log("Supervisor account saved; existing sessions revoked.");
+  console.log("Supervisor code saved; previous sessions revoked.");
 }
 main()
   .catch(() => {
