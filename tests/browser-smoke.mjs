@@ -233,6 +233,9 @@ try {
     assert.equal(await dialog.getByRole("combobox").nth(0).inputValue(), "68");
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
     await dialog
+      .getByLabel("سمّع الطالب شيئًا وأريد تسجيله", { exact: true })
+      .check();
+    await dialog
       .getByRole("button", { name: "حفظ التسجيل", exact: true })
       .click();
     await dialog.waitFor({ state: "hidden" });
@@ -240,6 +243,20 @@ try {
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
     assert.equal(await dialog.getByLabel("اسم الصورة (نص فقط)").count(), 0);
+    await dialog.getByLabel("واجب حفظ", { exact: true }).check();
+    await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    await page
+      .getByRole("button", { name: "+ واجب الغد", exact: true })
+      .click();
+    await dialog.getByText("تم تسجيل واجب الحفظ", { exact: true }).waitFor();
+    assert.equal(
+      await dialog
+        .getByRole("group", { name: "مدى الحفظ", exact: true })
+        .count(),
+      0,
+    );
+    await dialog.getByLabel("واجب مراجعة", { exact: true }).check();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     await page
@@ -253,12 +270,21 @@ try {
     await page.screenshot({ path: "work/smoke/student.png", fullPage: true });
     await page.getByRole("button", { name: "سجل الطالب", exact: true }).click();
     await page.getByText("مجموع التسميع المسجل", { exact: true }).waitFor();
-    await page.screenshot({ path: "work/smoke/student-history.png", fullPage: true });
+    await page.screenshot({
+      path: "work/smoke/student-history.png",
+      fullPage: true,
+    });
     await page.getByRole("button", { name: "أسبوع", exact: true }).click();
-    await page.getByRole("button", { name: "الأسبوع السابق", exact: true }).waitFor();
-    await page.getByRole("button", { name: "السجل الكامل", exact: true }).click();
+    await page
+      .getByRole("button", { name: "الأسبوع السابق", exact: true })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "السجل الكامل", exact: true })
+      .click();
     await page.getByLabel("من تاريخ", { exact: true }).waitFor();
-    await page.getByRole("button", { name: "تسجيل اليوم", exact: true }).click();
+    await page
+      .getByRole("button", { name: "تسجيل اليوم", exact: true })
+      .click();
     const individual = await context.request.get(
       new URL(
         await page
@@ -371,6 +397,9 @@ try {
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
     await dialog.getByText(/أبقينا واجب الغد/).waitFor();
+    await dialog
+      .getByRole("button", { name: "تعديل واجب الحفظ", exact: true })
+      .click();
     await page.screenshot({ path: "work/smoke/automatic-assignment.png" });
     await dialog
       .getByRole("group", { name: "مدى الحفظ" })
@@ -465,7 +494,7 @@ try {
     assert.equal(await dialog.getByLabel("سمّع الطالب آيات اليوم").count(), 0);
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
     await dialog
-      .getByRole("button", { name: "غير حافظ — دون تسميع", exact: true })
+      .getByRole("button", { name: "حفظ التسجيل", exact: true })
       .click();
     await dialog.waitFor({ state: "hidden" });
     await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
@@ -545,6 +574,9 @@ try {
         .count(),
       0,
     );
+    await dialog
+      .getByRole("button", { name: "تعديل واجب المراجعة", exact: true })
+      .click();
     await page.screenshot({ path: "work/smoke/hafiz-assignment.png" });
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
@@ -588,16 +620,12 @@ try {
     );
     await page.getByRole("button", { name: "غائب اليوم", exact: true }).click();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
-    await page
-      .getByRole("dialog", { name: "واجب الغد", exact: true })
-      .waitFor();
-    await dialog.getByText(/الطالب غائب ولا يوجد واجب سابق/).waitFor();
-    await page.screenshot({ path: "work/smoke/absence-new-assignment.png" });
-    await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
+    await page.screenshot({
+      path: "work/smoke/absence-without-assignment.png",
+    });
     const absentDay = await (await context.request.get(url)).json();
-    assert.equal(absentDay.students.at(-1).tomorrow.memorization, null);
-    assert.ok(absentDay.students.at(-1).tomorrow.review);
+    assert.equal(absentDay.students.at(-1).tomorrow, null);
     assert.equal(absentDay.students.at(-1).outcome, "ABSENT");
     const all = await context.request.get(`${url}/report?date=${day.date}`, {
       timeout: 90000,

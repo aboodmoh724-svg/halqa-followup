@@ -140,17 +140,16 @@ export default function Sheet({
   const [review, setReview] = useState(
     student.tomorrow?.review ?? student.today?.review ?? initialRange,
   );
-  const [memoryEnabled, setMemoryEnabled] = useState(
-    !student.reviewOnly &&
-      (!!student.tomorrow?.memorization || !student.tomorrow),
-  );
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [reviewEnabled, setReviewEnabled] = useState(
-    !!student.reviewOnly || !!student.tomorrow?.review || !student.tomorrow,
+    !!student.reviewOnly && !student.tomorrow?.review,
   );
+  const [memoryEditing, setMemoryEditing] = useState(false);
+  const [reviewEditing, setReviewEditing] = useState(false);
+  const [recordAttempt, setRecordAttempt] = useState(false);
   const [note, setNote] = useState(
     mode === "assignment" ? (student.tomorrow?.note ?? "") : student.note,
   );
-  const imageName = student.tomorrow?.imageName ?? "";
   const resultOnly = mode === "memory-result" || mode === "review-result";
   const isReview = mode === "review" || mode === "review-result";
   const [assessment, setAssessment] = useState<Assessment | "">(
@@ -228,6 +227,18 @@ export default function Sheet({
           onClose();
         return;
       }
+      if (assessment === "NOT_MASTERED" && !recordAttempt) {
+        if (
+          await onSave({
+            action: "assessment",
+            kind: isReview ? "REVIEW" : "MEMORIZATION",
+            assessment,
+            enrollmentId: student.enrollmentId,
+          })
+        )
+          onClose();
+        return;
+      }
       const result = rangeSchema.safeParse(range);
       if (!result.success) {
         setError(result.error.issues[0].message);
@@ -252,12 +263,19 @@ export default function Sheet({
             return;
           }
         }
+      if (
+        !memoryEnabled &&
+        !reviewEnabled &&
+        note === (student.tomorrow?.note ?? "")
+      ) {
+        setError("اختر واجبًا لإضافته، أو اضغط تعديل على الواجب المسجل.");
+        return;
+      }
       data = {
         action: "assignment",
-        memorization: memoryEnabled ? memory : null,
-        review: reviewEnabled ? review : null,
-        note,
-        imageName,
+        ...(memoryEnabled ? { memorization: memory } : {}),
+        ...(reviewEnabled ? { review } : {}),
+        ...(note !== (student.tomorrow?.note ?? "") ? { note } : {}),
       };
     } else if (mode === "note") data = { action: "note", note };
     else
@@ -267,17 +285,8 @@ export default function Sheet({
         note,
         carry: mode === "absent",
       };
-    if (await onSave({ ...data, enrollmentId: student.enrollmentId })) {
-      const hasToday = !!(student.today?.memorization || student.today?.review);
-      const hasTomorrow = !!(
-        student.tomorrow?.memorization || student.tomorrow?.review
-      );
-      onClose(
-        mode === "absent" && !hasToday && !hasTomorrow
-          ? "assignment"
-          : undefined,
-      );
-    }
+    if (await onSave({ ...data, enrollmentId: student.enrollmentId }))
+      onClose();
   }
   return (
     <dialog
@@ -342,32 +351,23 @@ export default function Sheet({
               </div>
             </fieldset>
             {!resultOnly && assessment === "NOT_MASTERED" && (
-              <button
-                type="button"
-                className="secondary"
-                disabled={busy}
-                onClick={async () => {
-                  if (
-                    await onSave({
-                      action: "assessment",
-                      kind: isReview ? "REVIEW" : "MEMORIZATION",
-                      assessment: "NOT_MASTERED",
-                      enrollmentId: student.enrollmentId,
-                    })
-                  )
-                    onClose();
-                }}
-              >
-                غير حافظ — دون تسميع
-              </button>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={recordAttempt}
+                  onChange={(e) => setRecordAttempt(e.target.checked)}
+                />
+                سمّع الطالب شيئًا وأريد تسجيله
+              </label>
             )}
-            {!resultOnly && (
-              <RangeFields
-                title="مدى التسميع"
-                value={range}
-                onChange={setRange}
-              />
-            )}
+            {!resultOnly &&
+              (assessment !== "NOT_MASTERED" || recordAttempt) && (
+                <RangeFields
+                  title="مدى التسميع"
+                  value={range}
+                  onChange={setRange}
+                />
+              )}
           </>
         )}
         {mode === "assignment" && (
@@ -429,43 +429,78 @@ export default function Sheet({
             {student.outcome === "ABSENT" &&
               !(student.tomorrow?.memorization || student.tomorrow?.review) && (
                 <p className="notice">
-                  الطالب غائب ولا يوجد واجب سابق؛ حدد واجب الغد الآن.
+                  الطالب غائب ولا يوجد واجب سابق؛ يمكنك إضافة واجب لاحقًا إن
+                  احتجت.
                 </p>
               )}
-            {!student.reviewOnly && (
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={memoryEnabled}
-                  onChange={(e) => setMemoryEnabled(e.target.checked)}
-                />
-                واجب حفظ
-              </label>
-            )}
-            {!student.reviewOnly && memoryEnabled && (
-              <RangeFields
-                title="مدى الحفظ"
-                value={memory}
-                onChange={setMemory}
-              />
-            )}
-            {!student.reviewOnly && (
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={reviewEnabled}
-                  onChange={(e) => setReviewEnabled(e.target.checked)}
-                />
-                واجب مراجعة
-              </label>
-            )}
-            {reviewEnabled && (
-              <RangeFields
-                title="مدى المراجعة"
-                value={review}
-                onChange={setReview}
-              />
-            )}
+            {(["memorization", "review"] as const).map((kind) => {
+              if (student.reviewOnly && kind === "memorization") return null;
+              const isMemory = kind === "memorization";
+              const label = isMemory ? "الحفظ" : "المراجعة";
+              const saved = student.tomorrow?.[kind];
+              const editing = isMemory ? memoryEditing : reviewEditing;
+              const enabled = isMemory ? memoryEnabled : reviewEnabled;
+              const setEnabled = isMemory ? setMemoryEnabled : setReviewEnabled;
+              const setEditing = isMemory ? setMemoryEditing : setReviewEditing;
+              return (
+                <section
+                  className="stack"
+                  key={kind}
+                  aria-label={`واجب ${label}`}
+                >
+                  {saved && !editing ? (
+                    <div className="notice">
+                      <strong>تم تسجيل واجب {label}</strong>
+                      <p>{rangeText(saved)}</p>
+                      <button
+                        type="button"
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditing(true);
+                          setEnabled(true);
+                        }}
+                      >
+                        تعديل واجب {label}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={enabled}
+                          onChange={(e) => setEnabled(e.target.checked)}
+                        />
+                        {isMemory ? "واجب حفظ" : "واجب مراجعة"}
+                      </label>
+                      {enabled && (
+                        <RangeFields
+                          title={`مدى ${label}`}
+                          value={isMemory ? memory : review}
+                          onChange={isMemory ? setMemory : setReview}
+                        />
+                      )}
+                      {saved && (
+                        <button
+                          type="button"
+                          className="text-button"
+                          disabled={busy}
+                          onClick={() => {
+                            setEditing(false);
+                            setEnabled(false);
+                            if (isMemory) setMemory(saved);
+                            else setReview(saved);
+                          }}
+                        >
+                          إلغاء تعديل واجب {label}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </section>
+              );
+            })}
           </>
         )}
         {mode === "absent" && (
@@ -476,7 +511,7 @@ export default function Sheet({
                 ? "سيُنقل واجب اليوم للغد تلقائيًا، مع إبقاء أي واجب سبق تحديده للغد."
                 : student.tomorrow?.memorization || student.tomorrow?.review
                   ? "لا يوجد واجب اليوم؛ واجب الغد الذي حددته سيبقى محفوظًا."
-                  : "لا يوجد واجب اليوم. بعد تسجيل الغياب ستفتح نافذة واجب الغد لتحديده."}
+                  : "سيُسجل الغياب دون واجب؛ يمكنك تحديد واجب لاحقًا."}
             </p>
             {student.tomorrow && (
               <p className="subtle">

@@ -37,7 +37,7 @@ test("parent report requires both recorded results and tomorrow assignment", () 
     reportIssues({ ...student, entries: [] }).includes("مدى الحفظ الجديد"),
   );
 });
-test("absence report requires homework but no recitation or assessment", () => {
+test("first-day absence needs neither homework nor recitation nor assessment", () => {
   const absent = {
     ...student,
     outcome: "ABSENT" as const,
@@ -46,7 +46,7 @@ test("absence report requires homework but no recitation or assessment", () => {
     reviewResult: null,
   };
   assert.deepEqual(reportIssues(absent), []);
-  assert.deepEqual(reportIssues({ ...absent, tomorrow: null }), ["واجب الغد"]);
+  assert.deepEqual(reportIssues({ ...absent, tomorrow: null }), []);
 });
 
 test("غير حافظ without recitation completes the day without invented pages or required amount", () => {

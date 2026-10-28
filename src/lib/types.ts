@@ -118,10 +118,10 @@ export const mutationSchema = z.discriminatedUnion("action", [
     action: z.literal("assignment"),
     enrollmentId: z.string().min(1),
     date: z.string(),
-    memorization: rangeSchema.nullable(),
-    review: rangeSchema.nullable(),
-    note: z.string().max(500),
-    imageName: z.string().max(100),
+    memorization: rangeSchema.nullable().optional(),
+    review: rangeSchema.nullable().optional(),
+    note: z.string().max(500).optional(),
+    imageName: z.string().max(100).optional(),
   }),
   z.object({ action: z.literal("close"), date: z.string() }),
 ]);
@@ -130,6 +130,7 @@ export function reportIssues(
   student: StudentView,
   legacyClosed = false,
 ): string[] {
+  if (student.outcome === "ABSENT") return [];
   if (
     legacyClosed &&
     student.outcome &&
@@ -138,30 +139,29 @@ export function reportIssues(
   )
     return [];
   const issues: string[] = [];
-  if (student.outcome !== "ABSENT") {
-    if (
-      !student.reviewOnly &&
-      (!student.memorizationResult ||
-        !["MASTERED", "NOT_MASTERED"].includes(student.memorizationResult))
-    )
-      issues.push("نتيجة الحفظ الجديد");
-    if (
-      !student.reviewResult ||
-      !["MASTERED", "NOT_MASTERED"].includes(student.reviewResult)
-    )
-      issues.push("نتيجة المراجعة");
-    if (
-      !student.reviewOnly &&
-      student.memorizationResult === "MASTERED" &&
-      !student.entries.some((e) => e.kind === "MEMORIZATION")
-    )
-      issues.push("مدى الحفظ الجديد");
-    if (
-      student.reviewResult === "MASTERED" &&
-      !student.entries.some((e) => e.kind === "REVIEW")
-    )
-      issues.push("مدى المراجعة");
-  }
+  if (
+    !student.reviewOnly &&
+    (!student.memorizationResult ||
+      !["MASTERED", "NOT_MASTERED"].includes(student.memorizationResult))
+  )
+    issues.push("نتيجة الحفظ الجديد");
+  if (
+    !student.reviewResult ||
+    !["MASTERED", "NOT_MASTERED"].includes(student.reviewResult)
+  )
+    issues.push("نتيجة المراجعة");
+  if (
+    !student.reviewOnly &&
+    student.memorizationResult === "MASTERED" &&
+    !student.entries.some((e) => e.kind === "MEMORIZATION")
+  )
+    issues.push("مدى الحفظ الجديد");
+  if (
+    student.reviewResult === "MASTERED" &&
+    !student.entries.some((e) => e.kind === "REVIEW")
+  )
+    issues.push("مدى المراجعة");
+
   if (
     student.reviewOnly
       ? !student.tomorrow?.review

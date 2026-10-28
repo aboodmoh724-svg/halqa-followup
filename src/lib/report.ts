@@ -29,7 +29,7 @@ export async function generateReport(
   if (pending.length)
     throw new HttpError(
       409,
-      `التقرير غير مكتمل: بقي ${pending.length} طالب. أكمل نتيجتي الحفظ والمراجعة وواجب الغد؛ ولنتيجة حافظ سجل التسميع؛ وللغائب حدد واجب الغد.`,
+      `التقرير غير مكتمل: بقي ${pending.length} طالب. أكمل نتيجتي الحفظ والمراجعة وواجب الغد؛ ولنتيجة حافظ سجل التسميع؛ الغياب لا يتطلب واجبًا سابقًا.`,
     );
   active++;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;

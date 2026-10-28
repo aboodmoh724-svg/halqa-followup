@@ -287,11 +287,9 @@ export async function mutateDay(
       status.reviewOnly &&
       (((m.action === "entry" || m.action === "assessment") &&
         m.kind === "MEMORIZATION") ||
-        (m.action === "assignment" && m.memorization !== null))
+        (m.action === "assignment" && m.memorization != null))
     )
       throw new HttpError(409, "الطالب حافظ؛ مساره مراجعة فقط دون حفظ جديد");
-    if (status.reviewOnly && m.action === "assignment" && !m.review)
-      throw new HttpError(409, "حدد مدى المراجعة لواجب الغد");
     if (m.action === "edit-entry") {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل تعديل التسميع");
@@ -521,14 +519,37 @@ export async function mutateDay(
       }
     }
     if (m.action === "assignment") {
+      const where = {
+        enrollmentId_dueDate: {
+          enrollmentId: m.enrollmentId,
+          dueDate: dayDate(nextDay(m.date)),
+        },
+      };
+      const previous = await tx.assignment.findUnique({ where });
+      const memory =
+        m.memorization === undefined ? previous?.memorization : m.memorization;
+      const review = m.review === undefined ? previous?.review : m.review;
+      if (status.reviewOnly ? !review : !memory && !review)
+        throw new HttpError(
+          409,
+          status.reviewOnly
+            ? "حدد مدى المراجعة لواجب الغد"
+            : "اختر واجب الحفظ أو المراجعة أولًا",
+        );
       const data = {
-        memorization: m.memorization ?? Prisma.DbNull,
-        review: m.review ?? Prisma.DbNull,
-        note: m.note.trim(),
-        imageName: m.imageName.trim(),
+        ...(m.memorization !== undefined
+          ? {
+              memorization: m.memorization ?? Prisma.DbNull,
+              autoMemorizationStatusId: null,
+              memorizationManual: true,
+            }
+          : {}),
+        ...(m.review !== undefined
+          ? { review: m.review ?? Prisma.DbNull }
+          : {}),
+        ...(m.note !== undefined ? { note: m.note.trim() } : {}),
+        ...(m.imageName !== undefined ? { imageName: m.imageName.trim() } : {}),
         carriedFromId: null,
-        autoMemorizationStatusId: null,
-        memorizationManual: true,
       };
       await tx.assignment.upsert({
         where: {
