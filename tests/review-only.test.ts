@@ -239,7 +239,6 @@ test(
       assert.deepEqual(reportIssues(saved), []);
       await post({
         action: "assignment",
-        memorization: null,
         review: range,
         note: "مراجعة الغد",
         imageName: "",

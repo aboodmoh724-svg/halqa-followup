@@ -44,6 +44,46 @@ test(
     const manual = { ...range, startAyah: 11, endAyah: 20 };
     try {
       await ensureDay(teacher.id, halqa.id, date);
+      // A first-day absence is complete without manufacturing homework.
+      await post({
+        action: "status",
+        outcome: "ABSENT",
+        carry: true,
+        note: "",
+      });
+      const firstDay = await read();
+      assert.equal(firstDay.today, null);
+      assert.equal(firstDay.tomorrow, null);
+      assert.deepEqual(reportIssues(firstDay), []);
+      await post({ action: "status", outcome: null, note: "" });
+      assert.ok(reportIssues(await read()).length > 0);
+      await assert.rejects(
+        () => post({ action: "assignment", review: null }),
+        /اختر واجب/,
+      );
+      // Save each homework part independently, retaining the same record and metadata.
+      await post({
+        action: "assignment",
+        memorization: manual,
+        note: "محفوظ",
+        imageName: "نص",
+      });
+      const original = (await read()).tomorrow!;
+      await post({ action: "assignment", review: range });
+      await post({ action: "assignment", review: range });
+      const combined = (await read()).tomorrow!;
+      assert.equal(combined.id, original.id);
+      assert.deepEqual(combined.memorization, manual);
+      assert.deepEqual(combined.review, range);
+      assert.equal(combined.note, "محفوظ");
+      assert.equal(combined.imageName, "نص");
+      assert.equal((await read()).entries.length, 0);
+      await post({ action: "assignment", memorization: range });
+      assert.deepEqual((await read()).tomorrow?.review, range);
+      await db.assignment.deleteMany({
+        where: { enrollmentId: enrollment.id },
+      });
+
       await db.assignment.create({
         data: {
           enrollmentId: enrollment.id,
@@ -59,6 +99,14 @@ test(
       assert.equal(totalPages(saved.entries), 0);
       assert.deepEqual(reportIssues(saved), []);
       assert.deepEqual(saved.tomorrow?.memorization, range);
+      const automaticOrigin = saved.tomorrow?.autoMemorizationStatusId;
+      assert.ok(automaticOrigin);
+      await post({ action: "assignment", review: manual });
+      const withReview = (await read()).tomorrow!;
+      assert.equal(withReview.autoMemorizationStatusId, automaticOrigin);
+      assert.equal(withReview.memorizationManual, false);
+      assert.deepEqual(withReview.memorization, range);
+
       await post({
         action: "assignment",
         memorization: manual,
