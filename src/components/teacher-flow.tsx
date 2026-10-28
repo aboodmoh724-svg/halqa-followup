@@ -9,6 +9,7 @@ import {
   Download,
   History,
 } from "lucide-react";
+import AcademyLogo from "./academy-logo";
 import Sheet, { type Mode } from "./recitation-sheet";
 import StudentHistory from "./student-history";
 import { dailyWindow } from "@/lib/dates";
@@ -246,9 +247,7 @@ export default function TeacherFlow() {
     return (
       <main className="shell login login-welcome">
         <div className="login-intro">
-          <div className="mark" aria-hidden="true">
-            <BookOpen size={28} strokeWidth={1.6} />
-          </div>
+          <AcademyLogo size={68} />
           <div>
             <p className="login-eyebrow">متابعة حلقات القرآن الكريم</p>
             <h1>{academyName}</h1>
@@ -316,7 +315,8 @@ export default function TeacherFlow() {
     return (
       <main className="shell">
         <div className="header">
-          <div>
+          <div className="branded-heading">
+            <AcademyLogo size={40} />
             <h1>أهلًا، {teacher.name}</h1>
             <p className="subtle">اختر الحلقة</p>
           </div>
@@ -845,7 +845,8 @@ export default function TeacherFlow() {
       ) : (
         <>
           <div className="header">
-            <div>
+            <div className="branded-heading">
+              <AcademyLogo size={40} />
               <h1>{day.halqaName}</h1>
               <p className="subtle">{dateText}</p>
               <p className="subtle">

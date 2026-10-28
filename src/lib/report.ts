@@ -1,3 +1,4 @@
+import { academyLogoPath } from "./branding";
 import { collectiveReportMarkup } from "./collective-report";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -60,15 +61,26 @@ export async function generateHtmlPdf(
         }),
       ),
     );
+    const logo = await readFile(
+      path.join(process.cwd(), "public", academyLogoPath),
+    );
+    const logoData = `data:image/jpeg;base64,${logo.toString("base64")}`;
+    const html = markup(
+      fonts.join("\n") +
+        "\n.academy-report-logo{width:44px;height:48px;object-fit:contain;flex-shrink:0;background:#fff;border-radius:5px}.brand{display:flex;align-items:center;gap:10px}",
+    ).replaceAll(`src="${academyLogoPath}"`, `src="${logoData}"`);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.route("**/*", (route) => route.abort());
-    await page.setContent(markup(fonts.join("\n")), {
+    await page.setContent(html, {
       waitUntil: "load",
       timeout: 15000,
     });
     await page.evaluate(async (fitDaily) => {
       await document.fonts.ready;
+      await Promise.all(
+        Array.from(document.images).map((image) => image.decode()),
+      );
       if (!fitDaily) return;
       if (document.querySelector("table")) {
         const content = document.querySelector<HTMLElement>(".content")!;
