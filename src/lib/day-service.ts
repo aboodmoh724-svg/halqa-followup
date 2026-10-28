@@ -120,21 +120,22 @@ export async function getDay(
   const since = dayDate(date);
   since.setUTCDate(since.getUTCDate() - 13);
   // One bounded query for the whole class, restricted to this teacher's halqa.
-  const history = session.closedAt
-    ? []
-    : await db.dailyStudentStatus.findMany({
-        where: {
-          halqaId,
-          session: {
-            date: { gte: since, lte: dayDate(date) },
-            halqa: { teacherId },
+  const history =
+    session.closedAt && date !== dayKey()
+      ? []
+      : await db.dailyStudentStatus.findMany({
+          where: {
+            halqaId,
+            session: {
+              date: { gte: since, lte: dayDate(date) },
+              halqa: { teacherId },
+            },
           },
-        },
-        include: {
-          session: { select: { date: true } },
-          entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
-        },
-      });
+          include: {
+            session: { select: { date: true } },
+            entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+          },
+        });
   const histories = new Map<string, Parameters<typeof suggestAssignment>[0]>();
   for (const h of history) {
     if (h.outcome === "ABSENT") continue;
@@ -234,7 +235,6 @@ export async function mutateDay(
     });
     const cutoff = dayReadOnlyReason(m.date, now);
     if (cutoff) throw new HttpError(409, cutoff);
-    if (current.closedAt) throw new HttpError(409, "تم إنهاء يوم الحلقة");
     if (m.action === "close") {
       const students = await tx.dailyStudentStatus.findMany({
         where: { sessionId: session.id },
@@ -278,6 +278,12 @@ export async function mutateDay(
       });
       return;
     }
+    // Editing today's submitted report reopens it; past-day/time cutoffs still apply.
+    if (current.closedAt)
+      await tx.dailySession.update({
+        where: { id: session.id },
+        data: { closedAt: null },
+      });
     const status = await tx.dailyStudentStatus.findFirst({
       where: { sessionId: session.id, enrollmentId: m.enrollmentId, halqaId },
       include: { entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },

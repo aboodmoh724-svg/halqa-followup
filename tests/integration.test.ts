@@ -330,19 +330,16 @@ test(
       await mutateDay(teacher.id, halqa.id, { action: "close", date: today });
       day = await getDay(teacher.id, halqa.id);
       assert.ok(day.closedAt);
-      await assert.rejects(
-        () => mutateDay(teacher.id, halqa.id, edit),
-        /تم إنهاء/,
-      );
+      await mutateDay(teacher.id, halqa.id, edit);
+      day = await getDay(teacher.id, halqa.id);
+      assert.equal(day.closedAt, null);
       assert.equal(day.students[0].entries.length, 3);
-      await assert.rejects(
-        () =>
-          mutateDay(teacher.id, halqa.id, {
-            ...entry,
-            requestKey: randomUUID(),
-          }),
-        /تم إنهاء/,
-      );
+      await mutateDay(teacher.id, halqa.id, { action: "close", date: today });
+      await mutateDay(teacher.id, halqa.id, {
+        ...entry,
+        requestKey: randomUUID(),
+      });
+      assert.equal((await getDay(teacher.id, halqa.id)).closedAt, null);
     } finally {
       await db.recitationEntry.deleteMany({
         where: { dailyStatus: { halqaId: halqa.id } },

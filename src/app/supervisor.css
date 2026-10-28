@@ -1,0 +1,356 @@
+.supervisor-shell {
+  width: min(100% - 32px, 760px);
+  margin: 0 auto;
+  padding: 24px 0 110px;
+}
+.supervisor-loading {
+  min-height: 70vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+}
+.supervisor-top,
+.supervisor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.supervisor-top h1 {
+  font-size: 23px;
+  margin: 0;
+}
+.supervisor-top p {
+  margin: 2px 0;
+}
+.supervisor-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid #e2e7e4;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: var(--ink);
+}
+.supervisor-heading {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+.supervisor-heading h2 {
+  font-size: 21px;
+  margin: 0;
+}
+.supervisor-heading .text-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.supervisor-intro {
+  padding: 24px;
+  border-radius: 24px;
+  background: #174d47;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.supervisor-intro .eyebrow {
+  color: #c7e2d6;
+}
+.supervisor-intro h2 {
+  font-size: 24px;
+  line-height: 1.65;
+  margin: 6px 0;
+}
+.supervisor-intro > p {
+  max-width: 420px;
+}
+.supervisor-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid #ffffff30;
+  margin-top: 22px;
+  padding-top: 16px;
+  gap: 12px;
+}
+.supervisor-totals > div {
+  display: flex;
+  flex-direction: column;
+}
+.supervisor-totals strong {
+  font-size: 30px;
+  line-height: 1.6;
+}
+.supervisor-totals strong small {
+  font-size: 15px;
+  font-weight: 400;
+}
+.supervisor-totals span {
+  font-size: 12px;
+  color: #d5e8e0;
+}
+.supervisor-list {
+  display: grid;
+  gap: 12px;
+}
+.supervisor-class,
+.supervisor-student,
+.supervisor-alert {
+  display: block;
+  width: 100%;
+  text-align: right;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #e0e6e1;
+  border-radius: 18px;
+  padding: 18px;
+}
+.supervisor-class-top,
+.supervisor-class-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.supervisor-class-top strong {
+  font-size: 17px;
+}
+.supervisor-class-top small,
+.supervisor-student small,
+.supervisor-alert small,
+.supervisor-alert-summary small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.supervisor-state {
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: #f2f1ed;
+  white-space: nowrap;
+}
+.supervisor-state.submitted,
+.supervisor-state.complete {
+  background: #e9f4f1;
+  color: #14665a;
+}
+.supervisor-state.progress {
+  background: #fbf4e6;
+  color: #856022;
+}
+.supervisor-progress {
+  height: 5px;
+  background: #edf0ed;
+  border-radius: 10px;
+  margin: 17px 0 11px;
+  overflow: hidden;
+}
+.supervisor-progress span {
+  display: block;
+  height: 100%;
+  background: #19786e;
+  border-radius: 10px;
+}
+.supervisor-class-bottom {
+  font-size: 12px;
+  color: var(--muted);
+}
+.supervisor-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  width: min(100%, 792px);
+  margin: auto;
+  background: #ffffffed;
+  backdrop-filter: blur(12px);
+  border-top: 1px solid #e1e6e1;
+  padding: 9px 8px max(9px, env(safe-area-inset-bottom));
+}
+.supervisor-nav button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  border-radius: 12px;
+}
+.supervisor-nav button[aria-current="page"] {
+  background: #e9f4f1;
+  color: #14665a;
+  font-weight: 700;
+}
+.supervisor-nav i {
+  position: absolute;
+  top: 0;
+  right: 18%;
+  background: #a24d35;
+  color: white;
+  font-size: 10px;
+  font-style: normal;
+  border-radius: 10px;
+  padding: 0 5px;
+}
+.supervisor-alert-summary {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: right;
+  width: 100%;
+  background: #fbf4e6;
+  border: 1px solid #eedfc6;
+  border-radius: 16px;
+  padding: 16px;
+  color: #765323;
+}
+.supervisor-alert-summary span {
+  flex: 1;
+}
+.supervisor-alert-summary small {
+  color: #896d47;
+  margin-top: 4px;
+}
+.supervisor-student,
+.supervisor-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.supervisor-student > span,
+.supervisor-alert > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.supervisor-student-result {
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.supervisor-search {
+  margin-bottom: 18px;
+}
+.supervisor-search input {
+  margin-top: 7px;
+}
+.supervisor-alert p {
+  font-size: 13px;
+  margin: 7px 0;
+}
+.supervisor-alert-dot {
+  width: 8px;
+  height: 8px;
+  background: #bc7650;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.supervisor-empty {
+  text-align: center;
+  background: white;
+  border-radius: 20px;
+  border: 1px solid #e1e7e1;
+  padding: 30px 20px;
+}
+.supervisor-empty svg {
+  color: var(--teal);
+}
+.supervisor-empty p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.supervisor-back {
+  margin: 4px 0 12px;
+}
+.supervisor-login {
+  max-width: 420px;
+  padding-top: 10vh;
+}
+.supervisor-login h1 {
+  font-size: 29px;
+  margin: 8px 0;
+}
+.supervisor-login form {
+  margin-top: 28px;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #e1e6e1;
+  border-radius: 22px;
+}
+.supervisor-seal {
+  display: grid;
+  place-items: center;
+  background: #e3eee6;
+  color: #17665b;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  margin-bottom: 24px;
+}
+.supervisor-teacher-link {
+  display: block;
+  text-align: center;
+  margin-top: 22px;
+  font-size: 13px;
+}
+.supervisor-report {
+  background: #fff;
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid #e1e6e1;
+}
+.supervisor-report h3 {
+  margin: 0;
+}
+.supervisor-report dl {
+  display: grid;
+  gap: 9px;
+}
+.supervisor-report dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f0f1ee;
+  padding-bottom: 8px;
+  gap: 12px;
+}
+.supervisor-report dt {
+  font-size: 13px;
+}
+.supervisor-report dd {
+  margin: 0;
+  font-weight: 700;
+}
+.supervisor-shell .notice {
+  font-size: 13px;
+}
+.supervisor-shell input {
+  min-width: 0;
+  width: 100%;
+}
+@media (max-width: 360px) {
+  .supervisor-shell {
+    width: calc(100% - 24px);
+  }
+  .supervisor-top h1 {
+    font-size: 20px;
+  }
+  .supervisor-class {
+    padding: 14px;
+  }
+  .supervisor-state {
+    font-size: 10px;
+  }
+  .supervisor-intro {
+    padding: 20px;
+  }
+}

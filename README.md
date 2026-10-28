@@ -66,3 +66,7 @@ TEST_DATABASE_URL="postgresql://.../halqa_test" npm test
 ```
 
 اختبار التكامل ينشئ سجلات اختبار خاصة به ثم ينظفها. يغطي تعدد التسميع، منع التكرار، حدود الآيات، عدم احتساب الواجب كإنجاز، انتقال واجب الغد، الغياب وإلغاءه، عزل الحلقات ومنع التعديل بعد الإغلاق. GitHub Actions يشغل PostgreSQL والفحوص نفسها.
+
+## Supervision
+
+The mobile supervision workspace is at `/supervisor`, with separate accounts and read-only access to classes and student history. Provisioning, alert definitions and same-day teacher corrections are documented in [docs/supervision.md](docs/supervision.md).

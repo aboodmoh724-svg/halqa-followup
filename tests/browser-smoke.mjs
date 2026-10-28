@@ -661,15 +661,16 @@ try {
     assert.equal(
       (
         await post({
-          action: "status",
+          action: "note",
           enrollmentId: day.students[0].enrollmentId,
-          outcome: "NOT_MEMORIZED",
-          note: "",
-          carry: false,
+          note: "تصحيح في اليوم نفسه",
         })
       ).status(),
-      409,
+      200,
     );
+    const reopened = await (await context.request.get(url)).json();
+    assert.equal(reopened.closedAt, null);
+    assert.equal((await post({ action: "close" })).status(), 200);
     assert.equal(
       (await context.cookies()).find((c) => c.name === "halqa_session")
         ?.httpOnly,

@@ -131,3 +131,20 @@ model Assignment {
   updatedAt DateTime @updatedAt
   @@unique([enrollmentId, dueDate])
 }
+
+// Separate identities and sessions prevent teacher codes granting supervisory access.
+model Supervisor {
+  id String @id @default(cuid())
+  username String @unique
+  name String
+  passwordHash String
+  active Boolean @default(true)
+  sessions SupervisorSession[]
+}
+model SupervisorSession {
+  id String @id
+  supervisorId String
+  supervisor Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([expiresAt])
+}
