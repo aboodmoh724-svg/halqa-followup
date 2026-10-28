@@ -206,6 +206,7 @@ try {
   assert.equal(pdf.status(), 200);
   const buffer = await pdf.body();
   assert.equal(buffer.subarray(0, 4).toString(), "%PDF");
+  assert.match(buffer.toString("latin1"), /\/Subtype\s*\/Image/);
   await writeFile("work/smoke/supervision-report.pdf", buffer);
   await page.screenshot({
     path: "work/smoke/supervisor-reports.png",

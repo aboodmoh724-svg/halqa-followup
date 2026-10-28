@@ -48,6 +48,10 @@ try {
   }
   await page.goto(base);
   await page.getByLabel("رمز الدخول", { exact: true }).waitFor();
+  await page
+    .getByRole("img", { name: /شعار/ })
+    .first()
+    .evaluate((image) => image.decode());
   await page.screenshot({ path: "work/smoke/login.png" });
   await page
     .getByLabel("رمز الدخول", { exact: true })
@@ -295,6 +299,7 @@ try {
     assert.equal(individual.status(), 200);
     const pdf = await individual.body();
     assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
+    assert.match(pdf.toString("latin1"), /\/Subtype\s*\/Image/);
     await writeFile("work/smoke/student.pdf", pdf);
     const teacher = await (
       await context.request.get(`${base}/api/halqas`)

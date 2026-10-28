@@ -14,6 +14,7 @@ import {
 import { academyName } from "@/lib/branding";
 import { assessmentLabels, type Assessment } from "@/lib/types";
 import type { SupervisorOverview } from "@/lib/supervisor-service";
+import AcademyLogo from "./academy-logo";
 import StudentHistory from "./student-history";
 import SupervisionReports from "./supervision-reports";
 type View = SupervisorOverview & { supervisor: { name: string } };
@@ -135,7 +136,8 @@ export default function SupervisorWorkspace() {
   return (
     <main className="supervisor-shell">
       <header className="supervisor-top">
-        <div>
+        <div className="branded-heading">
+          <AcademyLogo size={40} />
           <p className="eyebrow">{academyName}</p>
           <h1>إشراف قسم القرآن</h1>
           <p className="subtle">
