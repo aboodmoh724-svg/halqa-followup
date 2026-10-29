@@ -114,6 +114,7 @@ test(
         date: today,
         enrollmentId: enrollment.id,
         kind: "MEMORIZATION",
+        assessment: "MASTERED",
         range: { ...range, endAyah: 17 },
         requestKey: randomUUID(),
       };
@@ -262,9 +263,24 @@ test(
         note: "تسميع فعلي مع نتيجة غير حافظ",
         carry: false,
       });
+      await assert.rejects(
+        () =>
+          mutateDay(teacher.id, halqa.id, {
+            action: "assignment",
+            date: today,
+            enrollmentId: enrollment.id,
+            memorization: {
+              startSurah: 68,
+              startAyah: 1,
+              endSurah: 68,
+              endAyah: 25,
+            },
+          }),
+        /ابدأ من|الموضع التالي/,
+      );
       const nextRange = {
-        startSurah: 68,
-        startAyah: 1,
+        startSurah: 67,
+        startAyah: 20,
         endSurah: 68,
         endAyah: 25,
       };
