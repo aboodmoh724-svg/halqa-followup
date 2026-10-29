@@ -10,12 +10,7 @@ import {
   type AssignmentView,
 } from "./types";
 import { rangeSchema, pageAmount } from "./quran";
-import {
-  ensureMemorySequence,
-  enforceMemorySequence,
-  readMemorySequences,
-} from "./memorization-sequence";
-import { validateMemoryCandidate } from "./memorization-order";
+import { readMemorySequences } from "./memorization-sequence";
 import { suggestAssignment } from "./assignment-suggestions";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -186,18 +181,10 @@ export async function getDay(
           s.outcome === "ABSENT" ||
           s.memorizationResult === "NOT_MASTERED"
             ? null
-            : (() => {
-                const proposal = suggestAssignment(
-                  histories.get(s.enrollmentId) ?? [],
-                  "MEMORIZATION",
-                );
-                const sequence = memorySequences.get(s.enrollmentId);
-                return proposal &&
-                  sequence &&
-                  validateMemoryCandidate(sequence, proposal.range)
-                  ? null
-                  : proposal;
-              })(),
+            : suggestAssignment(
+                histories.get(s.enrollmentId) ?? [],
+                "MEMORIZATION",
+              ),
         review:
           s.outcome === "ABSENT" || s.reviewResult === "NOT_MASTERED"
             ? null
@@ -316,22 +303,6 @@ export async function mutateDay(
         (m.action === "assignment" && m.memorization != null))
     )
       throw new HttpError(409, "الطالب حافظ؛ مساره مراجعة فقط دون حفظ جديد");
-    const memoryChange =
-      m.action === "entry" || m.action === "assessment"
-        ? m.kind === "MEMORIZATION"
-        : m.action === "edit-entry"
-          ? status.entries.some(
-              (e) => e.id === m.entryId && e.kind === "MEMORIZATION",
-            )
-          : m.action === "assignment" && m.memorization != null;
-    const memoryPath = memoryChange
-      ? await ensureMemorySequence(
-          tx,
-          m.enrollmentId,
-          m.date,
-          m.action === "entry" ? m.range : undefined,
-        )
-      : null;
     if (m.action === "edit-entry") {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل تعديل التسميع");
@@ -633,18 +604,6 @@ export async function mutateDay(
         update: data,
       });
     }
-    if (memoryPath)
-      await enforceMemorySequence(
-        tx,
-        memoryPath,
-        m.date,
-        m.action === "edit-entry"
-          ? { id: m.entryId, range: m.range }
-          : undefined,
-        m.action === "assignment" && m.memorization
-          ? m.memorization
-          : undefined,
-      );
   });
   return getDay(teacherId, halqaId);
 }

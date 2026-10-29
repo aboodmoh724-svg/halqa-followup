@@ -1,9 +1,9 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
-import { dayKey, dayDate } from "../src/lib/dates";
+import { dayKey } from "../src/lib/dates";
 test(
-  "PostgreSQL: automatic anchor, contiguous progression, implicit direction, correction, homework and review isolation",
+  "PostgreSQL: Fatiha to Baqara, gaps, other surahs, homework and corrections save despite old strict anchors",
   { skip: !process.env.TEST_DATABASE_URL },
   async () => {
     process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -11,152 +11,87 @@ test(
     const { ensureDay, getDay, mutateDay } =
       await import("../src/lib/day-service");
     const teacher = await db.teacher.create({
-        data: {
-          name: "sequence test",
-          codeLookup: randomUUID(),
-          codeHash: "test",
-        },
-      }),
-      h = await db.halqa.create({
-        data: { name: "sequence test", teacherId: teacher.id },
-      }),
-      student = await db.student.create({ data: { name: "طالب التتابع" } }),
-      e = await db.enrollment.create({
-        data: { studentId: student.id, halqaId: h.id },
-      });
-    const legacyStudent = await db.student.create({
-      data: { name: "طالب السجل السابق" },
+      data: {
+        name: "advisory test",
+        codeLookup: randomUUID(),
+        codeHash: "test",
+      },
     });
-    const legacyEnrollment = await db.enrollment.create({
-      data: { studentId: legacyStudent.id, halqaId: h.id, position: 1 },
+    const h = await db.halqa.create({
+      data: { name: "advisory test", teacherId: teacher.id },
+    });
+    const student = await db.student.create({
+      data: { name: "طالب التتابع التجريبي" },
+    });
+    const e = await db.enrollment.create({
+      data: { studentId: student.id, halqaId: h.id },
     });
     const date = dayKey(),
-      now = new Date(date + "T09:00:00Z"),
-      range = (s: number, a: number, b: number) => ({
-        startSurah: s,
-        startAyah: a,
-        endSurah: s,
-        endAyah: b,
-      });
+      now = new Date(date + "T09:00:00Z");
+    const r = (s: number, a: number, b: number) => ({
+      startSurah: s,
+      startAyah: a,
+      endSurah: s,
+      endAyah: b,
+    });
     const post = (m: Record<string, unknown>) =>
-        mutateDay(teacher.id, h.id, { ...m, date, enrollmentId: e.id }, now),
-      read = async () => (await getDay(teacher.id, h.id, date)).students[0];
+      mutateDay(teacher.id, h.id, { ...m, date, enrollmentId: e.id }, now);
     const memory = (s: number, a: number, b: number, assessment = "MASTERED") =>
       post({
         action: "entry",
         kind: "MEMORIZATION",
-        range: range(s, a, b),
+        range: r(s, a, b),
         assessment,
         requestKey: randomUUID(),
       });
+    const read = async () => (await getDay(teacher.id, h.id, date)).students[0];
     try {
-      const priorDate = dayDate(date);
-      priorDate.setUTCDate(priorDate.getUTCDate() - 1);
-      const priorSession = await db.dailySession.create({
-        data: { halqaId: h.id, date: priorDate, closedAt: priorDate },
-      });
-      const priorStatus = await db.dailyStudentStatus.create({
-        data: {
-          halqaId: h.id,
-          sessionId: priorSession.id,
-          enrollmentId: legacyEnrollment.id,
-          outcome: "NOT_MEMORIZED",
-          memorizationResult: "MASTERED",
-          reviewResult: "NOT_MASTERED",
-        },
-      });
-      const priorEntry = await db.recitationEntry.create({
-        data: {
-          dailyStatusId: priorStatus.id,
-          kind: "MEMORIZATION",
-          assessment: "NOT_MASTERED",
-          startSurah: 2,
-          startAyah: 280,
-          endSurah: 2,
-          endAyah: 286,
-          requestKey: randomUUID(),
-        },
-      });
       await ensureDay(teacher.id, h.id, date);
-      assert.equal((await read()).memorySequence, undefined);
-      const priorView = (await getDay(teacher.id, h.id, date)).students.find(
-        (x) => x.enrollmentId === legacyEnrollment.id,
-      )!;
-      assert.deepEqual(priorView.memorySequence?.next, { surah: 3, ayah: 1 });
-      assert.equal(
-        await db.memorizationSequence.count({
-          where: { enrollmentId: legacyEnrollment.id },
-        }),
-        0,
-      );
-      await mutateDay(
-        teacher.id,
-        h.id,
-        {
-          action: "entry",
-          kind: "MEMORIZATION",
-          assessment: "MASTERED",
-          range: range(3, 1, 2),
-          requestKey: randomUUID(),
-          enrollmentId: legacyEnrollment.id,
-          date,
+      await memory(1, 1, 7);
+      const oldAnchor = await db.memorizationSequence.create({
+        data: {
+          enrollmentId: e.id,
+          startSurah: 114,
+          startAyah: 1,
+          initialDirection: "REVERSE",
+          anchorMastered: true,
         },
-        now,
-      );
-      assert.deepEqual(
-        (await getDay(teacher.id, h.id, date)).students.find(
-          (x) => x.enrollmentId === legacyEnrollment.id,
-        )!.memorySequence?.next,
-        { surah: 3, ayah: 3 },
-      );
-      const unchanged = await db.recitationEntry.findUniqueOrThrow({
-        where: { id: priorEntry.id },
       });
-      assert.equal(unchanged.assessment, "NOT_MASTERED");
-      assert.equal(unchanged.masteryResult, null);
-
+      assert.deepEqual((await read()).memorySequence?.next, {
+        surah: 2,
+        ayah: 1,
+      });
+      await memory(2, 1, 20);
+      assert.deepEqual((await read()).memorySequence?.next, {
+        surah: 2,
+        ayah: 21,
+      });
+      await memory(2, 23, 25);
+      assert.deepEqual((await read()).memorySequence?.next, {
+        surah: 2,
+        ayah: 26,
+      });
       await memory(67, 1, 5);
       assert.deepEqual((await read()).memorySequence?.next, {
         surah: 67,
         ayah: 6,
       });
-      const count = await db.recitationEntry.count({
-        where: { dailyStatus: { enrollmentId: e.id } },
-      });
-      await assert.rejects(() => memory(67, 7, 10), /الموضع التالي|أكمل/);
-      assert.equal(
-        await db.recitationEntry.count({
-          where: { dailyStatus: { enrollmentId: e.id } },
-        }),
-        count,
-      );
-      await memory(67, 6, 30);
-      assert.deepEqual((await read()).memorySequence?.adjacentSurahs, [66, 68]);
-      await assert.rejects(() => memory(65, 1, 5), /المجاورة/);
-      await memory(66, 1, 4);
-      assert.equal((await read()).memorySequence?.direction, "REVERSE");
-      assert.deepEqual((await read()).memorySequence?.next, {
-        surah: 66,
-        ayah: 5,
-      });
+      await post({ action: "assignment", memorization: r(68, 10, 20) });
+      assert.deepEqual((await read()).tomorrow?.memorization, r(68, 10, 20));
+      const first = (await read()).entries[0];
       await post({
-        action: "entry",
-        kind: "REVIEW",
-        range: range(80, 1, 5),
-        assessment: "MASTERED",
-        requestKey: randomUUID(),
+        action: "edit-entry",
+        entryId: first.id,
+        range: r(1, 1, 6),
       });
-      assert.deepEqual((await read()).memorySequence?.next, {
-        surah: 66,
-        ayah: 5,
-      });
+      assert.equal((await read()).entries[0].endAyah, 6);
       await post({
         action: "assessment",
         kind: "MEMORIZATION",
         assessment: "NOT_MASTERED",
       });
       assert.deepEqual((await read()).memorySequence?.next, {
-        surah: 66,
+        surah: 67,
         ayah: 1,
       });
       await post({
@@ -165,40 +100,82 @@ test(
         assessment: "MASTERED",
       });
       assert.deepEqual((await read()).memorySequence?.next, {
-        surah: 66,
-        ayah: 5,
+        surah: 67,
+        ayah: 6,
       });
-      await assert.rejects(
-        () => post({ action: "assignment", memorization: range(66, 6, 10) }),
-        /الموضع التالي/,
-      );
-      await post({ action: "assignment", memorization: range(66, 5, 10) });
-      const before = (await read()).entries.find(
-        (x) => x.kind === "MEMORIZATION",
-      )!;
-      await assert.rejects(
-        () =>
-          post({
-            action: "edit-entry",
-            entryId: before.id,
-            range: range(67, 1, 4),
-          }),
-        /الموضع التالي|أكمل/,
-      );
+      await post({
+        action: "entry",
+        kind: "REVIEW",
+        range: r(80, 1, 5),
+        assessment: "MASTERED",
+        requestKey: randomUUID(),
+      });
+      assert.deepEqual((await read()).memorySequence?.next, {
+        surah: 67,
+        ayah: 6,
+      });
+      const before = await db.recitationEntry.count({
+        where: { dailyStatus: { enrollmentId: e.id } },
+      });
+      await assert.rejects(() => memory(67, 1, 31));
       assert.equal(
-        (await read()).entries.find((x) => x.id === before.id)!.endAyah,
-        5,
+        await db.recitationEntry.count({
+          where: { dailyStatus: { enrollmentId: e.id } },
+        }),
+        before,
       );
-      await memory(66, 5, 6, "NOT_MASTERED");
-      assert.deepEqual((await read()).memorySequence?.next, {
-        surah: 66,
-        ayah: 5,
+      assert.deepEqual(
+        await db.memorizationSequence.findUnique({
+          where: { enrollmentId: e.id },
+        }),
+        oldAnchor,
+      );
+      const rowsBefore = await db.recitationEntry.findMany({
+        where: { dailyStatus: { enrollmentId: e.id } },
+        orderBy: { id: "asc" },
       });
-      await memory(66, 5, 6);
+      await read();
+      assert.deepEqual(
+        await db.recitationEntry.findMany({
+          where: { dailyStatus: { enrollmentId: e.id } },
+          orderBy: { id: "asc" },
+        }),
+        rowsBefore,
+      );
+      assert.equal((await read()).memorySequence?.learning, true);
+      // Even after enough school days establish the direction, advice never
+      // turns into a hidden write lock in week two.
+      for (let i = 0; i < 5; i++) {
+        const oldDate = new Date(date + "T00:00:00Z");
+        oldDate.setUTCDate(oldDate.getUTCDate() - 8 + i);
+        const session = await db.dailySession.create({
+          data: { halqaId: h.id, date: oldDate, closedAt: oldDate },
+        });
+        const status = await db.dailyStudentStatus.create({
+          data: {
+            halqaId: h.id,
+            sessionId: session.id,
+            enrollmentId: e.id,
+            memorizationResult: "MASTERED",
+          },
+        });
+        await db.recitationEntry.create({
+          data: {
+            dailyStatusId: status.id,
+            kind: "MEMORIZATION",
+            assessment: "MASTERED",
+            ...r(2, i + 1, i + 1),
+            requestKey: randomUUID(),
+          },
+        });
+      }
+      assert.equal((await read()).memorySequence?.learning, false);
+      await memory(70, 10, 20);
       assert.deepEqual((await read()).memorySequence?.next, {
-        surah: 66,
-        ayah: 7,
+        surah: 70,
+        ayah: 21,
       });
+      assert.equal((await read()).entries.at(-1)?.startSurah, 70);
     } finally {
       await db.memorizationSequence.deleteMany({
         where: { enrollmentId: e.id },
@@ -215,8 +192,6 @@ test(
       await db.assignment.deleteMany({ where: { enrollmentId: e.id } });
       await db.enrollment.delete({ where: { id: e.id } });
       await db.student.delete({ where: { id: student.id } });
-      await db.enrollment.delete({ where: { id: legacyEnrollment.id } });
-      await db.student.delete({ where: { id: legacyStudent.id } });
       await db.halqa.delete({ where: { id: h.id } });
       await db.teacher.delete({ where: { id: teacher.id } });
       await db.$disconnect();
