@@ -124,7 +124,7 @@ export async function getDay(
   });
   if (!session) throw new HttpError(404, "لم يبدأ يوم الحلقة");
   const since = dayDate(date);
-  since.setUTCDate(since.getUTCDate() - 13);
+  since.setUTCDate(since.getUTCDate() - 29);
   // One bounded query for the whole class, restricted to this teacher's halqa.
   const history =
     session.closedAt && date !== dayKey()
@@ -148,18 +148,21 @@ export async function getDay(
     const days = histories.get(h.enrollmentId) ?? [];
     days.push({
       date: h.session.date.toISOString().slice(0, 10),
-      entries: h.entries
-        .filter(
-          (e) =>
-            (e.kind === "MEMORIZATION"
-              ? h.memorizationResult
-              : h.reviewResult) === "MASTERED",
-        )
-        .map((e) => ({
-          ...e,
-          createdAt: e.createdAt.toISOString(),
-          pageAmount: e.pageAmount === null ? null : Number(e.pageAmount),
-        })),
+      entries: h.entries.map((e, index) => ({
+        ...e,
+        assessment:
+          e.kind === "MEMORIZATION"
+            ? (e.masteryResult ??
+              (h.entries.findLastIndex((x) => x.kind === e.kind) === index
+                ? h.memorizationResult
+                : null) ??
+              e.assessment)
+            : ((h.entries.findLastIndex((x) => x.kind === e.kind) === index
+                ? h.reviewResult
+                : null) ?? e.assessment),
+        createdAt: e.createdAt.toISOString(),
+        pageAmount: e.pageAmount === null ? null : Number(e.pageAmount),
+      })),
     });
     histories.set(h.enrollmentId, days);
   }
@@ -189,11 +192,15 @@ export async function getDay(
             : suggestAssignment(
                 histories.get(s.enrollmentId) ?? [],
                 "MEMORIZATION",
+                { beforeDate: date, throughDate: date },
               ),
         review:
           s.outcome === "ABSENT" || s.reviewResult === "NOT_MASTERED"
             ? null
-            : suggestAssignment(histories.get(s.enrollmentId) ?? [], "REVIEW"),
+            : suggestAssignment(histories.get(s.enrollmentId) ?? [], "REVIEW", {
+                beforeDate: date,
+                throughDate: date,
+              }),
       },
       name: s.enrollment.student.name,
       outcome: s.outcome,

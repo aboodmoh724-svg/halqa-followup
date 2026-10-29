@@ -11,6 +11,7 @@ import {
 import {
   assessmentLabels,
   type Assessment,
+  type AssignmentSuggestion,
   type StudentView,
 } from "@/lib/types";
 import {
@@ -141,6 +142,54 @@ function RangeFields({
         </p>
       )}
     </fieldset>
+  );
+}
+function SuggestionCard({
+  suggestion,
+  label,
+  busy,
+  onUse,
+  hasPrefill = false,
+}: {
+  suggestion: AssignmentSuggestion;
+  label: string;
+  busy: boolean;
+  onUse: () => void;
+  hasPrefill?: boolean;
+}) {
+  const [applied, setApplied] = useState(false);
+  const content = (
+    <section className="notice" aria-label={`اقتراح ${label} حسب المعدل`}>
+      <strong>
+        اقتراح {label}: {rangeText(suggestion.range)}
+      </strong>
+      <p>
+        نحو {formatPages(suggestion.averagePages)} صفحة، بناءً على آخر{" "}
+        {suggestion.sampleDays} أيام تسميع فعلية. يمكنك زيادة المدى أو تقليله.
+      </p>
+      <button
+        type="button"
+        className="text-button"
+        disabled={busy}
+        onClick={() => {
+          onUse();
+          setApplied(true);
+        }}
+      >
+        استخدام اقتراح {label}
+      </button>
+      {applied && (
+        <p role="status">تم تعبئة المقترح فقط؛ عدّل الآيات إن أردت ثم احفظ.</p>
+      )}
+    </section>
+  );
+  return hasPrefill ? (
+    <details>
+      <summary>اقتراح اختياري حسب المعدل</summary>
+      {content}
+    </details>
+  ) : (
+    content
   );
 }
 export default function Sheet({
@@ -367,6 +416,28 @@ export default function Sheet({
                     ? "تم تعبئة واجب اليوم. عدّل المدى حسب التسميع الفعلي."
                     : "حدد ما سمعه الطالب في هذه المرة."}
             </p>
+            {!resultOnly &&
+              student.suggestions?.[isReview ? "review" : "memorization"] &&
+              !(student.reviewOnly && !isReview) && (
+                <SuggestionCard
+                  suggestion={
+                    student.suggestions[isReview ? "review" : "memorization"]!
+                  }
+                  label={isReview ? "المراجعة" : "الحفظ"}
+                  busy={busy}
+                  hasPrefill={
+                    !!student.today?.[isReview ? "review" : "memorization"]
+                  }
+                  onUse={() => {
+                    setRange(
+                      student.suggestions![
+                        isReview ? "review" : "memorization"
+                      ]!.range,
+                    );
+                    setError("");
+                  }}
+                />
+              )}
             <fieldset className="assessment-picker">
               <legend>نتيجة {isReview ? "المراجعة" : "الحفظ"}</legend>
               <div className="assessment-options">
@@ -402,38 +473,27 @@ export default function Sheet({
               const suggestion = student.suggestions?.[kind];
               if (
                 !suggestion ||
-                student.tomorrow?.[kind] ||
+                (student.tomorrow?.[kind] &&
+                  !(kind === "memorization" ? memoryEditing : reviewEditing)) ||
                 (student.reviewOnly && kind === "memorization")
               )
                 return null;
               return (
-                <div className="notice" key={kind}>
-                  <strong>
-                    اقتراح {kind === "memorization" ? "حفظ" : "مراجعة"}:{" "}
-                    {rangeText(suggestion.range)}
-                  </strong>
-                  <p>
-                    بناءً على متوسط {formatPages(suggestion.averagePages)} صفحة
-                    في آخر {suggestion.sampleDays} أيام تسميع. لا يُحسب إنجازًا.
-                  </p>
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={busy}
-                    onClick={() => {
-                      if (kind === "memorization") {
-                        setMemory(suggestion.range);
-                        setMemoryEnabled(true);
-                      } else {
-                        setReview(suggestion.range);
-                        setReviewEnabled(true);
-                      }
-                    }}
-                  >
-                    استخدام اقتراح{" "}
-                    {kind === "memorization" ? "الحفظ" : "المراجعة"}
-                  </button>
-                </div>
+                <SuggestionCard
+                  key={kind}
+                  suggestion={suggestion}
+                  busy={busy}
+                  label={kind === "memorization" ? "الحفظ" : "المراجعة"}
+                  onUse={() => {
+                    if (kind === "memorization") {
+                      setMemory(suggestion.range);
+                      setMemoryEnabled(true);
+                    } else {
+                      setReview(suggestion.range);
+                      setReviewEnabled(true);
+                    }
+                  }}
+                />
               );
             })}
             {!student.reviewOnly &&
