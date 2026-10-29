@@ -43,6 +43,18 @@ test("student alerts distinguish three recorded absences and independent results
   assert.equal(studentStreaks(days).memory.length, 3);
   assert.equal(studentStreaks(days).review.length, 0);
   assert.equal(studentStreaks(days).absence.length, 0);
+  const schoolDays = days.map((d, i) => ({
+    ...d,
+    date: ["2026-10-23", "2026-10-26", "2026-10-27"][i],
+  }));
+  assert.equal(studentStreaks(schoolDays).memory.length, 3);
+  assert.equal(
+    studentStreaks([
+      ...schoolDays,
+      { ...schoolDays[0], date: "2026-10-25", memorizationResult: "MASTERED" },
+    ]).memory.length,
+    3,
+  );
   assert.equal(
     studentStreaks(days.map((d) => ({ ...d, outcome: "ABSENT" }))).memory
       .length,

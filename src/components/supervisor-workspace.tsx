@@ -264,15 +264,18 @@ export default function SupervisorWorkspace() {
                   </div>
                 </div>
               </section>
-              {data.alerts.length > 0 && (
+              {data.alerts.length + data.recordingAlerts.length > 0 && (
                 <button
                   className="supervisor-alert-summary"
                   onClick={() => setTab("alerts")}
                 >
                   <CircleAlert size={22} />
                   <span>
-                    <strong>{data.alerts.length} حالات تحتاج متابعة</strong>
-                    <small>الغياب المتكرر ونتائج الطلاب ونقص التسجيل</small>
+                    <strong>
+                      {data.alerts.length + data.recordingAlerts.length} حالات
+                      تحتاج متابعة
+                    </strong>
+                    <small>تسجيل الحلقات ونتائج الطلاب ومدى التسميع</small>
                   </span>
                   <ChevronLeft size={19} />
                 </button>
@@ -354,7 +357,7 @@ export default function SupervisorWorkspace() {
               <div className="supervisor-heading">
                 <div>
                   <p className="eyebrow">أولوية المتابعة</p>
-                  <h2>تنبيهات الطلاب</h2>
+                  <h2>تنبيهات المتابعة</h2>
                 </div>
                 <CircleAlert size={24} />
               </div>
@@ -364,6 +367,49 @@ export default function SupervisorWorkspace() {
                 مستوى الطالب.
               </p>
               <div className="supervisor-list">
+                {data.recordingAlerts.length > 0 && (
+                  <>
+                    <h3>تسجيل يحتاج متابعة — {data.deadlineDate}</h3>
+                    <p className="subtle">
+                      انتهى موعد التسجيل عند منتصف الليل. السبت والأحد عطلة؛ لا
+                      تُنشأ لهما حالات نقص.
+                    </p>
+                    {data.recordingAlerts.map((a) => (
+                      <article className="notice" key={a.id}>
+                        <button
+                          className="text-button"
+                          onClick={() => openClass(a.halqaId)}
+                        >
+                          {a.halqaName} · {a.teacherName}
+                        </button>
+                        <p>
+                          {a.kind === "not-started"
+                            ? "لم يبدأ التسجيل"
+                            : "التسجيل غير مكتمل"}{" "}
+                          · {a.missing.length} من {a.total} طلاب يحتاجون إكمالًا
+                        </p>
+                        <details>
+                          <summary>عرض الطلاب وما ينقصهم</summary>
+                          {a.missing.map((s) => (
+                            <button
+                              key={s.enrollmentId}
+                              className="supervisor-student"
+                              onClick={() =>
+                                openStudent(a.halqaId, s.enrollmentId)
+                              }
+                            >
+                              <span>
+                                <strong>{s.name}</strong>
+                                <small>{s.issues.join("، ")}</small>
+                              </span>
+                              <ChevronLeft size={18} />
+                            </button>
+                          ))}
+                        </details>
+                      </article>
+                    ))}
+                  </>
+                )}
                 {data.alerts.map((a) => (
                   <button
                     className="supervisor-alert"
@@ -382,10 +428,10 @@ export default function SupervisorWorkspace() {
                     <ChevronLeft size={18} />
                   </button>
                 ))}
-                {!data.alerts.length && (
+                {!data.alerts.length && !data.recordingAlerts.length && (
                   <div className="supervisor-empty">
                     <CheckCheck size={32} />
-                    <h3>لا توجد حالات متكررة تستدعي التنبيه</h3>
+                    <h3>لا توجد حالات تستدعي التنبيه</h3>
                     <p>تابع اكتمال تسجيل الحلقات من شاشة اليوم.</p>
                   </div>
                 )}

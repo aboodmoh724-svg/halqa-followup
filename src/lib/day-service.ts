@@ -1,7 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { HttpError } from "./auth";
-import { dayDate, dayKey, nextDay, dayReadOnlyReason } from "./dates";
+import {
+  dayDate,
+  dayKey,
+  nextAssignmentDay as nextDay,
+  dayReadOnlyReason,
+} from "./dates";
 import {
   mutationSchema,
   independentSummary,
@@ -605,5 +610,5 @@ export async function mutateDay(
       });
     }
   });
-  return getDay(teacherId, halqaId);
+  return getDay(teacherId, halqaId, m.date);
 }
