@@ -167,3 +167,16 @@ model MemorizationSequence {
   anchorMastered Boolean @default(false)
   createdAt DateTime @default(now())
 }
+
+model SupervisorCorrection {
+ id String @id @default(cuid())
+ supervisorId String
+ halqaId String
+ enrollmentId String
+ date DateTime @db.Date
+ action String
+ before Json
+ after Json
+ createdAt DateTime @default(now())
+ @@index([enrollmentId, date, createdAt])
+}

@@ -427,3 +427,28 @@
 .supervision-preview .subtle {
   font-size: 12px;
 }
+.supervisor-correction {
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.supervisor-correction label {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.supervisor-correction input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+.supervisor-correction select,
+.supervisor-correction input,
+.supervisor-correction textarea {
+  width: 100%;
+  min-width: 0;
+}
+.supervisor-correction .primary {
+  width: 100%;
+  margin-top: 16px;
+}

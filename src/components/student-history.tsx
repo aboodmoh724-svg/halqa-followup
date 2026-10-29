@@ -18,6 +18,8 @@ import {
   totalPages,
 } from "@/lib/quran";
 
+import SupervisorCorrection from "./supervisor-correction";
+
 const dateLabel = (value: string) =>
   new Intl.DateTimeFormat("ar", {
     day: "numeric",
@@ -46,6 +48,8 @@ export default function StudentHistory({
   today: string;
   supervisor?: boolean;
 }) {
+  const [correctionDate, setCorrectionDate] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"overview" | "week" | "all">("overview");
   const [weekEnd, setWeekEnd] = useState(today);
   const [from, setFrom] = useState("");
@@ -122,6 +126,26 @@ export default function StudentHistory({
         </div>
         <History size={23} aria-hidden="true" />
       </div>
+      {saved && (
+        <p className="notice" role="status">
+          تم حفظ تصحيح المشرف
+        </p>
+      )}
+      {supervisor && correctionDate && (
+        <SupervisorCorrection
+          key={correctionDate}
+          halqaId={halqaId}
+          enrollmentId={enrollmentId}
+          date={correctionDate}
+          onClose={() => setCorrectionDate(null)}
+          onSaved={() => {
+            setCorrectionDate(null);
+            setSaved(true);
+            reset();
+            setRetry((v) => v + 1);
+          }}
+        />
+      )}
       <div className="history-tabs" aria-label="طريقة عرض السجل">
         {(
           [
@@ -375,6 +399,18 @@ export default function StudentHistory({
                     </span>
                   </summary>
                   <div className="record-day-body">
+                    {supervisor && (
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          setSaved(false);
+                          setCorrectionDate(day.date);
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                      >
+                        تصحيح هذا اليوم
+                      </button>
+                    )}
                     <p className="subtle">
                       {day.closed
                         ? "يوم مغلق"
