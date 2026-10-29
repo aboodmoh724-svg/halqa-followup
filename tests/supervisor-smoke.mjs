@@ -305,6 +305,14 @@ try {
     .getByRole("button", { name: "معاينة التقرير", exact: true })
     .click();
   await report.getByText(/لا يوجد طلاب مطابقون للشروط/).waitFor();
+  assert.equal(
+    await report.getByLabel("إتقان لا يقل عن (%)", { exact: true }).count(),
+    0,
+  );
+  await report
+    .getByText(/أعلى 3 طلاب في الحفظ الجديد المتقن/)
+    .first()
+    .waitFor();
   await report
     .getByLabel("١. نوع التقرير", { exact: true })
     .selectOption("support");
@@ -470,6 +478,54 @@ try {
       (a) => a.enrollmentId === e.id && a.kind === "sequence",
     ).length,
     0,
+  );
+  await page
+    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("button", { name: "التقارير", exact: true })
+    .click();
+  await report
+    .getByLabel("١. نوع التقرير", { exact: true })
+    .selectOption("excellent");
+  await report.getByLabel("من تاريخ", { exact: true }).fill(date);
+  await report.getByLabel("إلى تاريخ", { exact: true }).fill(date);
+  await report.getByLabel("٣. الحلقة", { exact: true }).selectOption(h.id);
+  await report
+    .getByRole("button", { name: "معاينة التقرير", exact: true })
+    .click();
+  await report
+    .getByRole("heading", { name: "الأكثر حفظًا", exact: true })
+    .waitFor();
+  await report
+    .getByRole("heading", { name: "الأكثر مراجعة", exact: true })
+    .waitFor();
+  assert.equal(await report.locator("ol li").count(), 1);
+  await report.getByRole("button", { name: s.name, exact: true }).waitFor();
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+  }
+  await page.screenshot({
+    path: "work/smoke/excellence-top-three-mobile.png",
+    fullPage: true,
+  });
+  const excellenceLink = report.getByRole("link", {
+    name: "تنزيل التقرير PDF",
+    exact: true,
+  });
+  const excellencePdf = await context.request.get(
+    new URL(await excellenceLink.getAttribute("href"), base).href,
+    { timeout: 90000 },
+  );
+  assert.equal(excellencePdf.status(), 200);
+  const excellenceBytes = await excellencePdf.body();
+  assert(pdfPages(excellenceBytes).every((p) => p.height > p.width));
+  await writeFile(
+    "work/smoke/excellence-top-three-mobile.pdf",
+    excellenceBytes,
   );
   const transferUrl = `${base}/api/supervisor/halqas/${h.id}/students/${e.id}/transfer`;
   assert.equal((await teacherContext.request.get(transferUrl)).status(), 401);

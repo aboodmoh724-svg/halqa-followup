@@ -26,16 +26,34 @@ export function memoryDayEvidence(status: {
   memorizationResult: string | null;
   entries: MemoryEntry[];
 }) {
+  return recitationDayEvidence(status, "MEMORIZATION");
+}
+
+export function recitationDayEvidence(
+  status: {
+    outcome: string | null;
+    reviewOnly: boolean;
+    memorizationResult: string | null;
+    reviewResult?: string | null;
+    entries: MemoryEntry[];
+  },
+  kind: "MEMORIZATION" | "REVIEW",
+) {
   if (status.outcome === "ABSENT") return { known: true, pages: 0 };
-  if (status.reviewOnly) return { known: false, pages: 0 };
-  const entries = status.entries.filter((e) => e.kind === "MEMORIZATION");
+  if (kind === "MEMORIZATION" && status.reviewOnly)
+    return { known: false, pages: 0 };
+  const entries = status.entries.filter((e) => e.kind === kind);
   if (!entries.length) return { known: false, pages: 0 };
   let known = true,
     pages = 0;
   for (const [i, entry] of entries.entries()) {
     const grade =
       entry.masteryResult ??
-      (i === entries.length - 1 ? status.memorizationResult : null) ??
+      (i === entries.length - 1
+        ? kind === "MEMORIZATION"
+          ? status.memorizationResult
+          : status.reviewResult
+        : null) ??
       entry.assessment;
     if (
       !["MASTERED", "NOT_MASTERED"].includes(grade ?? "") ||

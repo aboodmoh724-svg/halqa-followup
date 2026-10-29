@@ -52,7 +52,7 @@ export function reportCriteria(q: SupervisionReportQuery) {
   if (q.type === "support")
     return "معيار المدرسة للحفظ الجديد المتقن خلال أسبوع كامل: أقل من 2 صفحة للصفين الأول والثاني، وأقل من 5 صفحات للصفوف الثالث إلى السادس. طلاب المراجعة فقط خارج المعيار. الغياب أو تكرار غير حافظ ليس معيارًا بديلًا للمقدار؛ التنبيهات مستقلة. لا يُصنف الطالب عند نقص بيانات الحفظ أو الحضور خلال الأسبوع.";
   if (q.type === "excellent")
-    return `إتقان ${q.mastery}% فأكثر بعد ${q.minDays} أيام مقيمة على الأقل، وغياب لا يزيد عن ${q.maxAbsences} أيام، دون سجلات ناقصة خلال الفترة. هذه شروط التقرير المختارة وليست اعتمادًا لشهادة.`;
+    return "أعلى 3 طلاب في الحفظ الجديد المتقن وأعلى 3 في المراجعة المتقنة من كل حلقة، بحسب مجموع الصفحات خلال الفترة. القائمتان مستقلتان، ويمكن ظهور الطالب فيهما. لا يُدرج مقدار صفر أو غير حافظ، وطلاب المراجعة فقط ينافسون في المراجعة. عند تساوي المقدار يُرتب الاسم أبجديًا ثم معرّف القيد، بحد أقصى 3 في كل قائمة. الترتيب من التسجيل المتاح، ولا يعني اعتماد شهادة.";
   if (q.type === "absence")
     return `طلاب لديهم يوم غياب مسجل واحد على الأقل خلال الفترة. الأيام دون تسجيل لا تعد غيابًا.`;
   return "الحفظ والمراجعة منفصلان. الكميات مجموع التسميع المسجل المتكرر، ولا تثبت إتمام سورة أو جزء. الأيام دون تسجيل لا تعد غيابًا أو غير حافظ.";
@@ -67,19 +67,9 @@ export function reportReasons(
   m: ReportMetric,
   q: SupervisionReportQuery,
 ): string[] {
-  const rate = m.assessedDays ? (m.masteredDays / m.assessedDays) * 100 : null;
   // Weekly page thresholds are evaluated with the pupil's full-week memory data.
   if (q.type === "support") return [];
-  if (q.type === "excellent")
-    return rate !== null &&
-      m.assessedDays >= q.minDays &&
-      rate >= q.mastery &&
-      m.absentDays <= q.maxAbsences &&
-      m.pendingDays === 0
-      ? [
-          `إتقان ${Math.round(rate)}% في ${m.assessedDays} أيام مقيمة؛ غياب ${m.absentDays}`,
-        ]
-      : [];
+  if (q.type === "excellent") return [];
   if (q.type === "absence")
     return m.absentDays ? [`غياب ${m.absentDays} أيام`] : [];
   return [];

@@ -845,3 +845,4 @@ h3 {
 .academy-logo{display:block;object-fit:contain;flex-shrink:0;background:#fff;border:1px solid #e5e9e5;border-radius:12px;padding:4px;height:auto;max-width:100%}.header .academy-logo,.supervisor-top .academy-logo{margin-bottom:8px}.login-intro>.academy-logo{padding:5px;border-radius:16px}
 
 .branded-heading{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:10px}.branded-heading>.academy-logo{grid-column:1;grid-row:1/span 4;margin:0}.branded-heading>:not(.academy-logo){grid-column:2}
+.supervision-preview .supervisor-report h4{margin:1rem 0 .5rem}.supervision-preview ol{padding-inline-start:1.5rem}.supervision-preview li{padding:.4rem 0}

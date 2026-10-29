@@ -1,9 +1,11 @@
 import {
   memoryDayEvidence,
+  recitationDayEvidence,
   weeklyMinimumPages,
   weeklySupportReason,
 } from "./weekly-support-policy";
 import { roundPages } from "./madani";
+import { topThree } from "./excellence-ranking";
 import { db } from "./db";
 import { HttpError } from "./auth";
 import {
@@ -28,7 +30,7 @@ export async function getSupervisionReport(raw: unknown) {
   const query =
     parsed.type === "comprehensive"
       ? { ...parsed, halqaId: undefined, enrollmentId: undefined }
-      : parsed.type === "support"
+      : ["support", "excellent"].includes(parsed.type)
         ? { ...parsed, enrollmentId: undefined }
         : parsed;
   if (query.to > dayKey())
@@ -59,7 +61,9 @@ export async function getSupervisionReport(raw: unknown) {
         where: {
           id: {
             notIn: excluded,
-            ...(query.halqaId && !selectedStudent && query.type !== "support"
+            ...(query.halqaId &&
+            !selectedStudent &&
+            !["support", "excellent"].includes(query.type)
               ? { equals: query.halqaId }
               : {}),
           },
@@ -286,6 +290,20 @@ export async function getSupervisionReport(raw: unknown) {
             ...memoryDayEvidence(s),
           }));
           return {
+            masteredReviewPages: roundPages(
+              e.dailyStatuses
+                .filter((s) =>
+                  studyDates.includes(
+                    s.session.date.toISOString().slice(0, 10),
+                  ),
+                )
+                .reduce(
+                  (n, s) => n + recitationDayEvidence(s, "REVIEW").pages,
+                  0,
+                ),
+            ),
+            memoryRank: null as number | null,
+            reviewRank: null as number | null,
             masteredMemoryPages: roundPages(
               memoryEvidence
                 .filter((d) => studyDates.includes(d.date))
@@ -474,6 +492,78 @@ export async function getSupervisionReport(raw: unknown) {
           rows.push({ ...merged, reasons: [reason] });
         }
       }
+      if (query.type === "excellent") {
+        const endRoster = studyDates.length
+          ? rosters.get(studyDates.at(-1)!)!
+          : new Set<string>();
+        const grouped = new Map<string, typeof eligibleRows>();
+        for (const row of eligibleRows) {
+          const id = studentIds.get(row.enrollmentId)!;
+          grouped.set(id, [...(grouped.get(id) ?? []), row]);
+        }
+        const candidates: typeof eligibleRows = [];
+        for (const group of grouped.values()) {
+          const end = group.find((r) => endRoster.has(r.enrollmentId));
+          if (!end || (query.halqaId && end.halqaId !== query.halqaId))
+            continue;
+          const merged = { ...end };
+          const current = baseRows.find(
+            (r) =>
+              r.active &&
+              studentIds.get(r.enrollmentId) ===
+                studentIds.get(end.enrollmentId),
+          );
+          if (current) {
+            merged.historyEnrollmentId = current.enrollmentId;
+            merged.historyHalqaId = current.halqaId;
+          }
+          for (const key of [
+            "expectedStudyDays",
+            "recordedStudyDays",
+            "completedStudyDays",
+            "missingStudyDays",
+            "memoryAssessedDays",
+            "memoryMasteredDays",
+            "reviewAssessedDays",
+            "reviewMasteredDays",
+            "recordedDays",
+            "presentDays",
+            "assessedDays",
+            "masteredDays",
+            "notMasteredDays",
+            "absentDays",
+            "pendingDays",
+            "memoryPages",
+            "reviewPages",
+            "masteredMemoryPages",
+            "masteredReviewPages",
+          ] as const)
+            merged[key] = roundPages(group.reduce((n, r) => n + r[key], 0));
+          merged.weeklyNotes = group
+            .flatMap((r) => r.weeklyNotes)
+            .sort((a, b) => a.date.localeCompare(b.date));
+          merged.latestNote = merged.weeklyNotes.at(-1)?.note ?? "";
+          candidates.push(merged);
+        }
+        rows = [];
+        for (const h of classes) {
+          const members = candidates.filter((r) => r.halqaId === h.id);
+          topThree(
+            members.filter((r) => !r.reviewOnly),
+            (r) => r.masteredMemoryPages,
+          ).forEach((r, i) => {
+            r.memoryRank = i + 1;
+          });
+          topThree(members, (r) => r.masteredReviewPages).forEach((r, i) => {
+            r.reviewRank = i + 1;
+          });
+          rows.push(
+            ...members
+              .filter((r) => r.memoryRank !== null || r.reviewRank !== null)
+              .map((r) => ({ ...r, reasons: [] })),
+          );
+        }
+      }
       const sum = (
         items: typeof rows,
         key:
@@ -489,6 +579,7 @@ export async function getSupervisionReport(raw: unknown) {
           | "recordedDays"
           | "presentDays"
           | "masteredMemoryPages"
+          | "masteredReviewPages"
           | "memoryPages"
           | "reviewPages",
       ) => items.reduce((n, r) => n + r[key], 0);
@@ -496,6 +587,8 @@ export async function getSupervisionReport(raw: unknown) {
         .filter(
           (h) =>
             query.type === "comprehensive" ||
+            (query.type === "excellent" &&
+              (!query.halqaId || h.id === query.halqaId)) ||
             rows.some((r) => r.halqaId === h.id),
         )
         .map((h) => {
@@ -531,9 +624,11 @@ export async function getSupervisionReport(raw: unknown) {
             : reportTitles[query.type],
         criteria:
           reportCriteria(query) +
-          (baseRows.length > aggregate.size
-            ? " تُجمع أيام الطالب المنتقل عند حساب شروط التقرير، ويُحسب مرة واحدة في إجمالي الطلاب، مع عرض سجله تحت كل حلقة."
-            : ""),
+          (["support", "excellent"].includes(query.type)
+            ? " تجمع أنشطة الطالب المنتقل مرة واحدة تحت حلقته في آخر يوم دراسة من الفترة."
+            : baseRows.length > aggregate.size
+              ? " تُجمع أيام الطالب المنتقل عند حساب شروط التقرير، ويُحسب مرة واحدة في إجمالي الطلاب، مع عرض سجله تحت كل حلقة."
+              : ""),
         generatedAt: new Date().toISOString(),
         rows,
         classes: classSummaries,
@@ -556,6 +651,7 @@ export async function getSupervisionReport(raw: unknown) {
           absentDays: rows.reduce((n, r) => n + r.absentDays, 0),
           pendingDays: rows.reduce((n, r) => n + r.pendingDays, 0),
           masteredMemoryPages: sum(rows, "masteredMemoryPages"),
+          masteredReviewPages: sum(rows, "masteredReviewPages"),
           memoryPages: rows.reduce((n, r) => n + r.memoryPages, 0),
           reviewPages: rows.reduce((n, r) => n + r.reviewPages, 0),
         },
