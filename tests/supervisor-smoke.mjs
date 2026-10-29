@@ -499,6 +499,12 @@ try {
     .getByRole("heading", { name: "الأكثر مراجعة", exact: true })
     .waitFor();
   assert.equal(await report.locator("ol li").count(), 1);
+  assert.equal(
+    await report
+      .locator("ol")
+      .evaluate((el) => getComputedStyle(el).listStyleType),
+    "decimal",
+  );
   await report.getByRole("button", { name: s.name, exact: true }).waitFor();
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
