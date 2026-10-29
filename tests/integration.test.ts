@@ -263,21 +263,17 @@ test(
         note: "تسميع فعلي مع نتيجة غير حافظ",
         carry: false,
       });
-      await assert.rejects(
-        () =>
-          mutateDay(teacher.id, halqa.id, {
-            action: "assignment",
-            date: today,
-            enrollmentId: enrollment.id,
-            memorization: {
-              startSurah: 68,
-              startAyah: 1,
-              endSurah: 68,
-              endAyah: 25,
-            },
-          }),
-        /ابدأ من|الموضع التالي/,
-      );
+      await mutateDay(teacher.id, halqa.id, {
+        action: "assignment",
+        date: today,
+        enrollmentId: enrollment.id,
+        memorization: {
+          startSurah: 68,
+          startAyah: 1,
+          endSurah: 68,
+          endAyah: 25,
+        },
+      });
       const nextRange = {
         startSurah: 67,
         startAyah: 20,

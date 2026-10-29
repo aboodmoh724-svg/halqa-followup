@@ -231,12 +231,13 @@ try {
       await dialog.getByRole("spinbutton").nth(0).inputValue(),
       "18",
     );
-    assert(
+    assert.equal(
       await dialog
         .getByRole("combobox")
         .first()
         .locator('option[value="68"]')
         .evaluate((option) => option.disabled),
+      false,
     );
     await dialog.getByRole("spinbutton").nth(0).fill("18");
     await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
@@ -524,7 +525,10 @@ try {
     await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
     assert.equal(await dialog.getByRole("combobox").nth(0).inputValue(), "67");
-    assert.equal(await dialog.getByRole("spinbutton").nth(1).inputValue(), "10");
+    assert.equal(
+      await dialog.getByRole("spinbutton").nth(1).inputValue(),
+      "10",
+    );
     await dialog
       .getByRole("button", { name: "حفظ التسجيل", exact: true })
       .click();
@@ -545,6 +549,53 @@ try {
       path: "work/smoke/not-mastered-range.png",
       fullPage: true,
     });
+    // Non-blocking sequence advice: reproduce Fatiha -> Baqara, then skip two
+    // verses deliberately. Both surah selectors stay unrestricted.
+    for (const [surah, start, end] of [
+      [1, 1, 7],
+      [2, 1, 20],
+      [2, 23, 25],
+    ]) {
+      await page
+        .getByRole("button", { name: "+ حفظ جديد", exact: true })
+        .click();
+      assert.equal(
+        await dialog
+          .getByRole("combobox")
+          .first()
+          .locator("option:not([value='0'])")
+          .count(),
+        114,
+      );
+      if (surah === 2 && start === 23) {
+        assert.equal(
+          await dialog.getByRole("spinbutton").first().inputValue(),
+          "21",
+        );
+      }
+      await dialog.getByRole("combobox").first().selectOption(String(surah));
+      await dialog.getByRole("spinbutton").nth(0).fill(String(start));
+      await dialog.getByRole("spinbutton").nth(1).fill(String(end));
+      await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
+      if (start === 23) {
+        await dialog
+          .getByText(/البداية المقترحة:.*الآية 21.*يمكنك حفظ/)
+          .waitFor();
+        await page.screenshot({ path: "work/smoke/sequence-advice.png" });
+      }
+      await dialog
+        .getByRole("button", { name: "حفظ التسجيل", exact: true })
+        .click();
+      await dialog.waitFor({ state: "hidden" });
+    }
+    const flexible = await (await context.request.get(url)).json();
+    assert.equal(flexible.students[1].entries.length, 5);
+    assert.equal(flexible.students[1].entries.at(-1).startAyah, 23);
+    assert.deepEqual(flexible.students[1].memorySequence.next, {
+      surah: 2,
+      ayah: 26,
+    });
+    assert.equal(flexible.students[1].memorySequence.learning, true);
     // A hafiz can complete the day by recording review alone.
     await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
     await page

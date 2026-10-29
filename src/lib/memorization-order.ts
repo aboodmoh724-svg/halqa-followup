@@ -7,20 +7,139 @@ export type MemorySequenceView = {
   next: VersePoint | null;
   adjacentSurahs: number[];
   complete: boolean;
-  problem?: string;
+  learning: boolean;
+  sampleDays: number;
 };
-export type MemoryAttempt = { range: QuranRange; mastered: boolean | null };
-export class MemoryOrderError extends Error {}
+export type MemoryAttempt = {
+  range: QuranRange;
+  mastered: boolean | null;
+  date: string;
+};
+// Fatiha is introductory and does not establish a pupil's direction.
 export function inferMemoryDirection(
   range: QuranRange,
 ): MemoryDirection | null {
   if (range.startSurah !== range.endSurah)
     return range.startSurah < range.endSurah ? "FORWARD" : "REVERSE";
-  return range.startSurah <= 2
+  return range.startSurah === 2
     ? "FORWARD"
     : range.startSurah === 114
       ? "REVERSE"
       : null;
+}
+/** Suggest from recorded attempts; never certify coverage or gate eligibility. */
+export function suggestMemorySequence(
+  attempts: MemoryAttempt[],
+): MemorySequenceView | undefined {
+  const records = attempts.filter(
+    (a) => rangeSchema.safeParse(a.range).success,
+  );
+  if (!records.length) return undefined;
+  const days = [...new Set(records.map((a) => a.date))];
+  const recentDays = new Set(days.slice(-14));
+  const recent = records.filter((a) => recentDays.has(a.date));
+  const votes = new Map<string, Set<MemoryDirection>>();
+  const vote = (date: string, direction: MemoryDirection) => {
+    const set = votes.get(date) ?? new Set<MemoryDirection>();
+    set.add(direction);
+    votes.set(date, set);
+  };
+  let previous: MemoryAttempt | undefined;
+  for (const a of recent) {
+    if (a.mastered !== true) continue;
+    if (
+      a.range.startSurah !== a.range.endSurah &&
+      a.range.startSurah !== 1 &&
+      a.range.endSurah !== 1
+    )
+      vote(
+        a.date,
+        a.range.startSurah < a.range.endSurah ? "FORWARD" : "REVERSE",
+      );
+    if (
+      previous &&
+      previous.range.endSurah !== 1 &&
+      a.range.startSurah !== 1 &&
+      Math.abs(a.range.startSurah - previous.range.endSurah) === 1
+    )
+      vote(
+        a.date,
+        a.range.startSurah > previous.range.endSurah ? "FORWARD" : "REVERSE",
+      );
+    previous = a;
+  }
+  const forward = [...votes.values()].filter((v) => v.has("FORWARD")).length;
+  const reverse = [...votes.values()].filter((v) => v.has("REVERSE")).length;
+  const conflict = forward > 0 && reverse > 0;
+  const latest =
+    records.findLast((a) => a.mastered !== null) ?? records.at(-1)!;
+  const last = latest.range;
+  const edge = recent.some(
+    (a) => a.mastered === true && a.range.startSurah === 2,
+  )
+    ? "FORWARD"
+    : recent.some((a) => a.mastered === true && a.range.startSurah === 114)
+      ? "REVERSE"
+      : null;
+  const observed = forward ? "FORWARD" : reverse ? "REVERSE" : null;
+  const direction: MemoryDirection | null = conflict
+    ? null
+    : (observed ?? edge);
+  const span = (Date.parse(days.at(-1)!) - Date.parse(days[0])) / 86400000;
+  const learning =
+    days.length < 5 ||
+    span < 7 ||
+    !direction ||
+    (!edge && Math.max(forward, reverse) < 2);
+  let next: VersePoint | null;
+  let adjacentSurahs: number[] = [];
+  if (latest.mastered !== true)
+    next = { surah: last.startSurah, ayah: last.startAyah };
+  else if (last.endAyah < surahs[last.endSurah - 1].ayahs)
+    next = { surah: last.endSurah, ayah: last.endAyah + 1 };
+  else if (last.endSurah === 1) next = { surah: 2, ayah: 1 };
+  else if (direction) {
+    const s = last.endSurah + (direction === "FORWARD" ? 1 : -1);
+    next = s >= 2 && s <= 114 ? { surah: s, ayah: 1 } : null;
+  } else {
+    next = null;
+    adjacentSurahs = [last.endSurah - 1, last.endSurah + 1].filter(
+      (s) => s >= 2 && s <= 114,
+    );
+  }
+  return {
+    start: { surah: last.startSurah, ayah: last.startAyah },
+    direction,
+    next,
+    adjacentSurahs,
+    complete:
+      latest.mastered === true &&
+      !next &&
+      !!direction &&
+      !adjacentSurahs.length,
+    learning,
+    sampleDays: days.length,
+  };
+}
+/** Informational only. Callers must not reject a save because of this advice. */
+export function memoryRangeAdvice(
+  view: MemorySequenceView,
+  range: QuranRange,
+): string | null {
+  if (!rangeSchema.safeParse(range).success) return null;
+  const next = view.next;
+  if (
+    next &&
+    (range.startSurah !== next.surah || range.startAyah !== next.ayah)
+  )
+    return `البداية المقترحة: ${surahs[next.surah - 1].name}، الآية ${next.ayah}. راجع المدى؛ يمكنك حفظ ما أدخلته كما هو.`;
+  if (
+    view.direction &&
+    range.startSurah !== range.endSurah &&
+    range.startSurah < range.endSurah !== (view.direction === "FORWARD")
+  )
+    return "هذا المدى يختلف عن اتجاه الحفظ المقترح من السجل. يمكنك حفظه كما هو.";
+  return null;
 }
 function index(point: VersePoint, direction: MemoryDirection) {
   let n = point.ayah - 1;
@@ -29,266 +148,34 @@ function index(point: VersePoint, direction: MemoryDirection) {
   else for (let s = 114; s > point.surah; s--) n += surahs[s - 1].ayahs;
   return n;
 }
-function pointAt(n: number, direction: MemoryDirection): VersePoint | null {
-  const step = direction === "FORWARD" ? 1 : -1;
-  for (
-    let s = direction === "FORWARD" ? 1 : 114;
-    s >= 1 && s <= 114;
-    s += step
-  ) {
-    if (n < surahs[s - 1].ayahs) return { surah: s, ayah: n + 1 };
-    n -= surahs[s - 1].ayahs;
-  }
-  return null;
-}
-function directionFor(
-  start: VersePoint,
-  initial: MemoryDirection | null,
-  attempts: MemoryAttempt[],
-) {
-  if (initial) return initial;
-  const edge = inferMemoryDirection({
-    startSurah: start.surah,
-    endSurah: start.surah,
-    startAyah: start.ayah,
-    endAyah: start.ayah,
-  });
-  if (edge) return edge;
-  for (const a of attempts) {
-    if (a.range.startSurah !== start.surah) {
-      if (Math.abs(a.range.startSurah - start.surah) !== 1)
-        throw new MemoryOrderError(
-          "اختر السورة المجاورة بعد إكمال السورة الحالية؛ لا يمكن القفز بين السور.",
-        );
-      return a.range.startSurah > start.surah ? "FORWARD" : "REVERSE";
-    }
-    if (a.range.startSurah !== a.range.endSurah)
-      return a.range.startSurah < a.range.endSurah ? "FORWARD" : "REVERSE";
-  }
-  return null;
-}
-type Interval = [number, number];
-function updateCoverage(
-  covered: Interval[],
-  first: number,
-  last: number,
-  result: boolean | null,
-): Interval[] {
-  if (result === null || last < first) return covered;
-  if (!result)
-    return covered.flatMap(([a, b]) =>
-      b < first || a > last
-        ? [[a, b] as Interval]
-        : [
-            ...(a < first ? [[a, first - 1] as Interval] : []),
-            ...(b > last ? [[last + 1, b] as Interval] : []),
-          ],
-    );
-  const sorted = [...covered, [first, last] as Interval].sort(
-    (a, b) => a[0] - b[0],
-  );
-  const merged: Interval[] = [];
-  for (const pair of sorted) {
-    const tail = merged.at(-1);
-    if (tail && pair[0] <= tail[1] + 1) tail[1] = Math.max(tail[1], pair[1]);
-    else merged.push([...pair]);
-  }
-  return merged;
-}
-function nextUncovered(covered: Interval[], start: number) {
-  let cursor = start;
-  for (const [a, b] of covered) {
-    if (b < cursor) continue;
-    if (a > cursor) break;
-    cursor = b + 1;
-  }
-  return cursor;
-}
-export function replayMemorySequence(
-  start: VersePoint,
-  initial: MemoryDirection | null,
-  attempts: MemoryAttempt[],
-): MemorySequenceView {
-  rangeSchema.parse({
-    startSurah: start.surah,
-    endSurah: start.surah,
-    startAyah: start.ayah,
-    endAyah: start.ayah,
-  });
-  const direction = directionFor(start, initial, attempts);
-  if (!direction) {
-    let cursor = start.ayah;
-    let covered: Interval[] = [];
-    for (const a of attempts) {
-      const r = rangeSchema.parse(a.range);
-      if (
-        r.startSurah !== start.surah ||
-        r.endSurah !== start.surah ||
-        r.startAyah > cursor
-      )
-        throw new MemoryOrderError(
-          `أكمل ${surahs[start.surah - 1].name} من الآية ${cursor} أولًا؛ لا يمكن تجاوز آيات غير مكتملة.`,
-        );
-      covered = updateCoverage(
-        covered,
-        Math.max(start.ayah, r.startAyah),
-        r.endAyah,
-        a.mastered,
-      );
-      cursor = nextUncovered(covered, start.ayah);
-    }
-    const finished = cursor > surahs[start.surah - 1].ayahs;
-    return {
-      start,
-      direction: null,
-      next: finished ? null : { surah: start.surah, ayah: cursor },
-      adjacentSurahs: finished
-        ? [start.surah - 1, start.surah + 1].filter((s) => s >= 2 && s <= 114)
-        : [],
-      complete: false,
-    };
-  }
-  const minimum = index({ surah: start.surah, ayah: 1 }, direction),
-    stop = index(
-      {
-        surah: direction === "FORWARD" ? 114 : start.surah === 1 ? 1 : 2,
-        ayah: surahs[
-          (direction === "FORWARD" ? 114 : start.surah === 1 ? 1 : 2) - 1
-        ].ayahs,
-      },
-      direction,
-    );
-  const baseline = index(start, direction);
-  let cursor = baseline;
-  let covered: Interval[] = [];
-  for (const a of attempts) {
-    const r = rangeSchema.parse(a.range);
-    const first = index({ surah: r.startSurah, ayah: r.startAyah }, direction),
-      last = index({ surah: r.endSurah, ayah: r.endAyah }, direction);
-    if (
-      (r.startSurah !== r.endSurah &&
-        r.startSurah < r.endSurah !== (direction === "FORWARD")) ||
-      first < minimum ||
-      last < first ||
-      last > stop
-    )
-      throw new MemoryOrderError("هذا المدى يخالف اتجاه الحفظ المسجل للطالب.");
-    if (first > cursor) {
-      const next = pointAt(cursor, direction);
-      throw new MemoryOrderError(
-        next
-          ? `الموضع التالي هو ${surahs[next.surah - 1].name}، الآية ${next.ayah}. أكمل ما قبله دون قفز.`
-          : "وصل الطالب إلى نهاية تتابع الحفظ المسجل.",
-      );
-    }
-    covered = updateCoverage(
-      covered,
-      Math.max(baseline, first),
-      last,
-      a.mastered,
-    );
-    cursor = nextUncovered(covered, baseline);
-  }
-  const complete = cursor > stop;
-  return {
-    start,
-    direction,
-    next: complete ? null : pointAt(cursor, direction),
-    adjacentSurahs: [],
-    complete,
-  };
-}
-export function validateMemoryCandidate(
-  view: MemorySequenceView,
-  range: QuranRange,
-): string | null {
-  try {
-    if (view.problem) return view.problem;
-    if (view.complete)
-      return "وصل الطالب إلى نهاية مسار الحفظ المسجل؛ يمكن متابعة المراجعة.";
-    if (!view.direction) {
-      if (view.next) {
-        if (
-          range.startSurah !== view.next.surah ||
-          range.startAyah > view.next.ayah
-        )
-          return `ابدأ من ${surahs[view.next.surah - 1].name}، الآية ${view.next.ayah}، أو من موضع مسجل قبله.`;
-      } else if (
-        !view.adjacentSurahs.includes(range.startSurah) &&
-        range.startSurah !== view.start.surah
-      )
-        return "اختر السورة المجاورة وفق ترتيب الحفظ؛ لا يمكن القفز بين السور.";
-      if (!view.next && range.startSurah !== view.start.surah) {
-        const dir = range.startSurah > view.start.surah ? "FORWARD" : "REVERSE";
-        return validateMemoryCandidate(
-          {
-            ...view,
-            direction: dir,
-            next: { surah: range.startSurah, ayah: 1 },
-            adjacentSurahs: [],
-          },
-          range,
-        );
-      }
-      return null;
-    }
-    const next = view.next!;
-    const first = index(
-        { surah: range.startSurah, ayah: range.startAyah },
-        view.direction,
-      ),
-      last = index(
-        { surah: range.endSurah, ayah: range.endAyah },
-        view.direction,
-      );
-    if (
-      first < index({ surah: view.start.surah, ayah: 1 }, view.direction) ||
-      last < first ||
-      (view.direction === "REVERSE" &&
-        view.start.surah !== 1 &&
-        range.endSurah < 2)
-    )
-      return "هذا المدى يخالف اتجاه الحفظ المسجل للطالب.";
-    if (first > index(next, view.direction))
-      return `الموضع التالي هو ${surahs[next.surah - 1].name}، الآية ${next.ayah}. أكمل ما قبله دون قفز.`;
-    return null;
-  } catch {
-    return "تحقق من مدى الحفظ وتسلسله.";
-  }
-}
 export function nextMemoryRange(
   view: MemorySequenceView | undefined | null,
-  assignment: QuranRange | null | undefined,
+  assignment: QuranRange | undefined | null,
+  recordedToday = false,
 ): QuranRange {
-  if (!view || view.problem || view.complete)
-    return (
-      assignment ?? { startSurah: 0, startAyah: 1, endSurah: 0, endAyah: 1 }
-    );
-  if (!view.next) {
-    if (
-      assignment &&
-      (view.adjacentSurahs.includes(assignment.startSurah) ||
-        (assignment.startSurah === view.start.surah &&
-          assignment.endSurah !== view.start.surah)) &&
-      !validateMemoryCandidate(view, assignment)
-    )
-      return assignment;
-    return { startSurah: 0, startAyah: 1, endSurah: 0, endAyah: 1 };
-  }
+  const empty = { startSurah: 0, startAyah: 1, endSurah: 0, endAyah: 1 };
+  if (!view?.next) return assignment ?? empty;
   const p = view.next;
-  if (
-    assignment &&
-    rangeSegments(assignment).some(
-      (s) =>
-        s.surah === p.surah && s.startAyah <= p.ayah && s.endAyah >= p.ayah,
+  if (assignment) {
+    if (
+      rangeSegments(assignment).some(
+        (s) =>
+          s.surah === p.surah && s.startAyah <= p.ayah && s.endAyah >= p.ayah,
+      )
     )
-  ) {
-    const candidate = rangeSchema.parse({
-      ...assignment,
-      startSurah: p.surah,
-      startAyah: p.ayah,
-    });
-    if (!validateMemoryCandidate(view, candidate)) return candidate;
+      return rangeSchema.parse({
+        ...assignment,
+        startSurah: p.surah,
+        startAyah: p.ayah,
+      });
+    const end = { surah: assignment.endSurah, ayah: assignment.endAyah };
+    const alreadyPassed =
+      p.surah === end.surah
+        ? p.ayah > end.ayah
+        : view.direction &&
+          index(p, view.direction) > index(end, view.direction);
+    // Keep a teacher's different/future assignment instead of silently discarding it.
+    if (!alreadyPassed && !recordedToday) return assignment;
   }
   return {
     startSurah: p.surah,
