@@ -1,6 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { ClipboardList, Download, SlidersHorizontal } from "lucide-react";
+import { ClipboardList, Download } from "lucide-react";
 import type { SupervisionReport } from "@/lib/supervision-report";
 import { reportTitles, reportPeriod } from "@/lib/supervision-report-policy";
 import { reportNumber as formatPages } from "@/lib/report-format";
@@ -23,9 +23,6 @@ export default function SupervisionReports({
     [dates, setDates] = useState(() => reportPeriod("previous-week", today)),
     [halqaId, setHalqaId] = useState(""),
     [enrollmentId, setEnrollmentId] = useState("");
-  const [minDays, setMinDays] = useState("3"),
-    [mastery, setMastery] = useState("70"),
-    [maxAbsences, setMaxAbsences] = useState("0");
   const [snapshot, setSnapshot] = useState<{
       query: string;
       data: SupervisionReport;
@@ -37,9 +34,6 @@ export default function SupervisionReports({
     type,
     from: dates.from,
     to: dates.to,
-    minDays,
-    mastery,
-    maxAbsences,
   });
   if (halqaId && type !== "comprehensive") params.set("halqaId", halqaId);
   if (type === "student" && enrollmentId)
@@ -90,7 +84,6 @@ export default function SupervisionReports({
                 setPreset("previous-week");
                 setDates(reportPeriod("previous-week", today));
               }
-              setMastery(t === "excellent" ? "90" : "70");
               setError("");
             }}
           >
@@ -246,52 +239,10 @@ export default function SupervisionReports({
           </p>
         )}
         {type === "excellent" && (
-          <fieldset className="supervision-criteria">
-            <legend>
-              <SlidersHorizontal size={16} /> شروط التقرير المختارة
-            </legend>
-            <p className="subtle">
-              قيم ابتدائية قابلة للتعديل، وليست تصنيفًا مدرسيًا معتمدًا. نسبة
-              الإتقان تخص الأيام المقيمة، ولا تقيس مقدار حفظ المصحف.
-            </p>
-            <label>
-              الحد الأدنى للأيام المقيمة
-              <input
-                type="number"
-                min="1"
-                max="93"
-                required
-                value={minDays}
-                onChange={(e) => setMinDays(e.target.value)}
-              />
-            </label>
-            <label>
-              إتقان لا يقل عن (%)
-              <input
-                type="number"
-                min="0"
-                max="100"
-                required
-                value={mastery}
-                onChange={(e) => setMastery(e.target.value)}
-              />
-            </label>
-            <label>
-              الحد الأعلى لأيام الغياب
-              <input
-                type="number"
-                min="0"
-                max="93"
-                required
-                value={maxAbsences}
-                onChange={(e) => setMaxAbsences(e.target.value)}
-              />
-            </label>
-            <p className="subtle">
-              نقص التسجيل وحده لا يجعل الطالب بحاجة للمتابعة. تقرير التميز
-              يستبعد السجلات الناقصة، ويقيّم مسار المراجعة فقط وفق المراجعة.
-            </p>
-          </fieldset>
+          <p className="notice">
+            أعلى 3 طلاب في الحفظ الجديد المتقن وأعلى 3 في المراجعة المتقنة من كل
+            حلقة، بحسب الصفحات. قائمتان مستقلتان؛ دون شروط نسبة أو غياب.
+          </p>
         )}
         {error && (
           <p className="notice error" role="alert">
@@ -320,32 +271,57 @@ export default function SupervisionReports({
               الأسبوع أو عدم تحديد الصف. نقص البيانات لا يعني ضعف الطالب.
             </p>
           )}
-          <div className="supervision-report-totals">
-            <div>
-              <strong>
-                {formatPages(
-                  type === "support"
-                    ? data.summary.masteredMemoryPages
-                    : data.summary.memoryPages,
-                )}
-              </strong>
-              <span>
-                {type === "support" ? "صفحة حفظ جديد متقن" : "صفحة حفظ مسجلة"}
-              </span>
+          {type === "excellent" ? (
+            <div className="supervision-report-totals">
+              <div>
+                <strong>{data.summary.students}</strong>
+                <span>طلاب دون تكرار</span>
+              </div>
+              <div>
+                <strong>{data.classes.length}</strong>
+                <span>حلقات</span>
+              </div>
+              <div>
+                <strong>
+                  {data.rows.filter((r) => r.memoryRank !== null).length}
+                </strong>
+                <span>متميزون في الحفظ</span>
+              </div>
+              <div>
+                <strong>
+                  {data.rows.filter((r) => r.reviewRank !== null).length}
+                </strong>
+                <span>متميزون في المراجعة</span>
+              </div>
             </div>
-            <div>
-              <strong>{formatPages(data.summary.reviewPages)}</strong>
-              <span>صفحة مراجعة مسجلة</span>
+          ) : (
+            <div className="supervision-report-totals">
+              <div>
+                <strong>
+                  {formatPages(
+                    type === "support"
+                      ? data.summary.masteredMemoryPages
+                      : data.summary.memoryPages,
+                  )}
+                </strong>
+                <span>
+                  {type === "support" ? "صفحة حفظ جديد متقن" : "صفحة حفظ مسجلة"}
+                </span>
+              </div>
+              <div>
+                <strong>{formatPages(data.summary.reviewPages)}</strong>
+                <span>صفحة مراجعة مسجلة</span>
+              </div>
+              <div>
+                <strong>{data.summary.absentDays}</strong>
+                <span>حالات غياب يومية</span>
+              </div>
+              <div>
+                <strong>{data.summary.pendingDays}</strong>
+                <span>سجلات ناقصة</span>
+              </div>
             </div>
-            <div>
-              <strong>{data.summary.absentDays}</strong>
-              <span>حالات غياب يومية</span>
-            </div>
-            <div>
-              <strong>{data.summary.pendingDays}</strong>
-              <span>سجلات ناقصة</span>
-            </div>
-          </div>
+          )}
           <a
             className="primary supervision-download"
             href={`/api/supervisor/reports?${snapshot!.query}&format=pdf`}
@@ -356,56 +332,120 @@ export default function SupervisionReports({
             تُحدّث البيانات عند تنزيل التقرير. الكميات مجموع التسميع المسجل
             المتكرر، ولا تثبت إتمام جزء أو استحقاق شهادة.
           </p>
-          <div className="supervisor-list">
-            {data.rows.slice(0, shown).map((r) => (
-              <article className="supervisor-report" key={r.enrollmentId}>
-                <h3>{r.name}</h3>
-                <p className="subtle">
-                  {r.halqaName} · {r.reviewOnly ? "مراجعة فقط" : "حفظ ومراجعة"}
-                </p>
-                <p>
-                  {r.assessedDays} أيام مقيمة من {r.recordedDays} أيام مسجلة ·
-                  غياب {r.absentDays}
-                </p>
-                <p>
-                  حافظ: {r.masteredDays} · غير حافظ: {r.notMasteredDays}
-                  {r.masteryRate === null ? "" : ` · إتقان ${r.masteryRate}%`}
-                </p>
-                <p>
-                  {type === "support" ? (
-                    <>
-                      الحفظ الجديد المتقن: {formatPages(r.masteredMemoryPages)}{" "}
-                      صفحة · الحد الأسبوعي: {r.weeklyMinimumPages} صفحة
-                    </>
-                  ) : (
-                    <>
-                      الحفظ: {formatPages(r.memoryPages)} صفحة · المراجعة:{" "}
-                      {formatPages(r.reviewPages)} صفحة
-                    </>
+          {type === "excellent" ? (
+            <div className="supervisor-list">
+              {data.classes.map((c) => (
+                <section className="supervisor-report" key={c.id}>
+                  <h3>{c.name}</h3>
+                  <p className="subtle">{c.teacherName}</p>
+                  {(["memory", "review"] as const).map((kind) => {
+                    const winners = data.rows
+                      .filter(
+                        (r) =>
+                          r.halqaId === c.id &&
+                          (kind === "memory" ? r.memoryRank : r.reviewRank) !==
+                            null,
+                      )
+                      .sort((a, b) =>
+                        kind === "memory"
+                          ? a.memoryRank! - b.memoryRank!
+                          : a.reviewRank! - b.reviewRank!,
+                      );
+                    return (
+                      <div key={kind}>
+                        <h4>
+                          {kind === "memory" ? "الأكثر حفظًا" : "الأكثر مراجعة"}
+                        </h4>
+                        {winners.length ? (
+                          <ol>
+                            {winners.map((r) => (
+                              <li key={r.enrollmentId}>
+                                <button
+                                  className="text-button"
+                                  onClick={() =>
+                                    onStudent(
+                                      r.historyHalqaId,
+                                      r.historyEnrollmentId,
+                                    )
+                                  }
+                                >
+                                  {r.name}
+                                </button>{" "}
+                                ·{" "}
+                                {formatPages(
+                                  kind === "memory"
+                                    ? r.masteredMemoryPages
+                                    : r.masteredReviewPages,
+                                )}{" "}
+                                صفحة
+                              </li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <p className="subtle">
+                            لا يوجد إنجاز متقن مسجل لهذا المسار.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="supervisor-list">
+              {data.rows.slice(0, shown).map((r) => (
+                <article className="supervisor-report" key={r.enrollmentId}>
+                  <h3>{r.name}</h3>
+                  <p className="subtle">
+                    {r.halqaName} ·{" "}
+                    {r.reviewOnly ? "مراجعة فقط" : "حفظ ومراجعة"}
+                  </p>
+                  <p>
+                    {r.assessedDays} أيام مقيمة من {r.recordedDays} أيام مسجلة ·
+                    غياب {r.absentDays}
+                  </p>
+                  <p>
+                    حافظ: {r.masteredDays} · غير حافظ: {r.notMasteredDays}
+                    {r.masteryRate === null ? "" : ` · إتقان ${r.masteryRate}%`}
+                  </p>
+                  <p>
+                    {type === "support" ? (
+                      <>
+                        الحفظ الجديد المتقن:{" "}
+                        {formatPages(r.masteredMemoryPages)} صفحة · الحد
+                        الأسبوعي: {r.weeklyMinimumPages} صفحة
+                      </>
+                    ) : (
+                      <>
+                        الحفظ: {formatPages(r.memoryPages)} صفحة · المراجعة:{" "}
+                        {formatPages(r.reviewPages)} صفحة
+                      </>
+                    )}
+                  </p>
+                  {r.reasons.length > 0 && (
+                    <p className="notice">{r.reasons.join("؛ ")}</p>
                   )}
-                </p>
-                {r.reasons.length > 0 && (
-                  <p className="notice">{r.reasons.join("؛ ")}</p>
-                )}
-                {r.latestNote && <p>{r.latestNote}</p>}
-                <button
-                  className="text-button"
-                  onClick={() =>
-                    onStudent(r.historyHalqaId, r.historyEnrollmentId)
-                  }
-                >
-                  فتح سجل الطالب ←
-                </button>
-              </article>
-            ))}
-          </div>
+                  {r.latestNote && <p>{r.latestNote}</p>}
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      onStudent(r.historyHalqaId, r.historyEnrollmentId)
+                    }
+                  >
+                    فتح سجل الطالب ←
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
           {!data.rows.length && (
             <p className="supervisor-empty">
               لا يوجد طلاب مطابقون للشروط في هذه الفترة. يمكنك تغيير الفترة أو
               شروط التقرير.
             </p>
           )}
-          {shown < data.rows.length && (
+          {type !== "excellent" && shown < data.rows.length && (
             <button
               className="secondary space"
               onClick={() => setShown((n) => n + 20)}

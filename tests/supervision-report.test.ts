@@ -76,7 +76,7 @@ test("specialized criteria require evidence and do not treat missing records as 
       { assessedDays: 3, masteredDays: 3, absentDays: 0, pendingDays: 0 },
       query("excellent"),
     ).length,
-    1,
+    0,
   );
 });
 test(
@@ -178,6 +178,18 @@ test(
       await assert.rejects(() =>
         getSupervisionReport({ ...raw, type: "support" }),
       );
+      const hafiz = await db.dailyStudentStatus.findFirstOrThrow({
+        where: { enrollmentId: enrollments[1].id },
+      });
+      await db.recitationEntry.create({
+        data: {
+          dailyStatusId: hafiz.id,
+          kind: "REVIEW",
+          assessment: "MASTERED",
+          ...range,
+          requestKey: randomUUID(),
+        },
+      });
       const excellent = await getSupervisionReport({
         ...raw,
         type: "excellent",

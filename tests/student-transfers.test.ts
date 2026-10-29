@@ -283,7 +283,7 @@ test(
         mastery: 90,
         maxAbsences: 0,
       });
-      assert(excellent.rows.some((r) => r.enrollmentId === es[0].id));
+      assert(!excellent.rows.some((r) => r.enrollmentId === es[0].id));
       assert(excellent.rows.some((r) => r.enrollmentId === moved.enrollmentId));
 
       assert.equal(
