@@ -212,7 +212,7 @@ export default function Sheet({
   const dialog = useRef<HTMLDialogElement>(null);
   const [range, setRange] = useState(
     entry ??
-      (mode === "memory"
+      (mode === "memory" || mode === "memory-result"
         ? nextMemoryRange(student.memorySequence, student.today?.memorization)
         : (student.today?.review ?? initialRange)),
   );
@@ -229,12 +229,21 @@ export default function Sheet({
   );
   const [memoryEditing, setMemoryEditing] = useState(false);
   const [reviewEditing, setReviewEditing] = useState(false);
-  const [recordAttempt, setRecordAttempt] = useState(false);
   const [note, setNote] = useState(
     mode === "assignment" ? (student.tomorrow?.note ?? "") : student.note,
   );
-  const resultOnly = mode === "memory-result" || mode === "review-result";
   const isReview = mode === "review" || mode === "review-result";
+  const activityMode = [
+    "memory",
+    "review",
+    "memory-result",
+    "review-result",
+  ].includes(mode);
+  const resultOnly =
+    (mode === "memory-result" || mode === "review-result") &&
+    student.entries.some(
+      (e) => e.kind === (isReview ? "REVIEW" : "MEMORIZATION"),
+    );
   const [assessment, setAssessment] = useState<Assessment | "">(
     resultOnly
       ? (((isReview
@@ -284,33 +293,12 @@ export default function Sheet({
       return;
     }
     let data: Record<string, unknown>;
-    if (mode === "memory" || mode === "review" || resultOnly) {
+    if (activityMode) {
       if (assessment !== "MASTERED" && assessment !== "NOT_MASTERED") {
         setError("اختر نتيجة التسميع أولًا");
         return;
       }
       if (resultOnly) {
-        if (
-          assessment === "MASTERED" &&
-          !student.entries.some(
-            (e) => e.kind === (isReview ? "REVIEW" : "MEMORIZATION"),
-          )
-        ) {
-          onClose(isReview ? "review" : "memory");
-          return;
-        }
-        if (
-          await onSave({
-            action: "assessment",
-            kind: isReview ? "REVIEW" : "MEMORIZATION",
-            assessment,
-            enrollmentId: student.enrollmentId,
-          })
-        )
-          onClose();
-        return;
-      }
-      if (assessment === "NOT_MASTERED" && !recordAttempt) {
         if (
           await onSave({
             action: "assessment",
@@ -422,21 +410,19 @@ export default function Sheet({
             />
           </>
         )}
-        {(mode === "memory" || mode === "review" || resultOnly) && (
+        {activityMode && (
           <>
             <p className="notice">
               {resultOnly
                 ? "تعديل النتيجة فقط؛ لن يضاف تسميع جديد أو صفحات أخرى."
-                : mode === "memory" && student.memorySequence
+                : !isReview && student.memorySequence
                   ? (student.memorySequence.problem ??
                     (student.memorySequence.complete
                       ? "وصل الطالب إلى نهاية تتابع الحفظ المسجل؛ المراجعة متاحة."
                       : student.memorySequence.next
                         ? `الموضع التالي: ${surahs[student.memorySequence.next.surah - 1].name}، الآية ${student.memorySequence.next.ayah}. حدد نهاية ما سمعه الطالب فعليًا دون تجاوز آيات غير مكتملة.`
                         : "اكتمل تسميع السورة المسجلة. اختر السورة المجاورة وفق ترتيب الطالب؛ سيُعرف الاتجاه تلقائيًا."))
-                  : student.today?.[
-                        mode === "review" ? "review" : "memorization"
-                      ]
+                  : student.today?.[isReview ? "review" : "memorization"]
                     ? "تم تعبئة واجب اليوم. عدّل المدى حسب التسميع الفعلي."
                     : "حدد ما سمعه الطالب في هذه المرة."}
             </p>
@@ -459,28 +445,15 @@ export default function Sheet({
                 ))}
               </div>
             </fieldset>
-            {!resultOnly && assessment === "NOT_MASTERED" && (
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={recordAttempt}
-                  onChange={(e) => setRecordAttempt(e.target.checked)}
-                />
-                سمّع الطالب شيئًا وأريد تسجيله
-              </label>
+            {!resultOnly && (
+              <RangeFields
+                title="مدى التسميع"
+                value={range}
+                onChange={setRange}
+                memorySequence={!isReview ? student.memorySequence : undefined}
+                memorization={!isReview}
+              />
             )}
-            {!resultOnly &&
-              (assessment !== "NOT_MASTERED" || recordAttempt) && (
-                <RangeFields
-                  title="مدى التسميع"
-                  value={range}
-                  onChange={setRange}
-                  memorySequence={
-                    mode === "memory" ? student.memorySequence : undefined
-                  }
-                  memorization={mode === "memory"}
-                />
-              )}
           </>
         )}
         {mode === "assignment" && (
@@ -656,7 +629,7 @@ export default function Sheet({
         <button className="primary" disabled={busy} type="submit">
           {busy
             ? "جارٍ الحفظ…"
-            : mode === "memory" || mode === "review" || resultOnly
+            : activityMode
               ? resultOnly
                 ? "حفظ النتيجة"
                 : "حفظ التسجيل"

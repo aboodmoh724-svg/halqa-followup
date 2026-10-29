@@ -6,7 +6,7 @@ import { pageAmount, totalPages } from "../src/lib/quran";
 import { reportIssues } from "../src/lib/types";
 
 test(
-  "PostgreSQL: no-recitation results, manual homework, stale notes and independent attempts",
+  "PostgreSQL: both results require ranges, manual homework, stale notes and independent attempts",
   { skip: !process.env.TEST_DATABASE_URL },
   async () => {
     process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -41,7 +41,7 @@ test(
     const read = async () =>
       (await getDay(teacher.id, halqa.id, date)).students[0];
     const range = { startSurah: 67, startAyah: 1, endSurah: 67, endAyah: 10 };
-    const manual = { ...range, startAyah: 11, endAyah: 20 };
+    const manual = { ...range, startAyah: 1, endAyah: 20 };
     try {
       await ensureDay(teacher.id, halqa.id, date);
       // A first-day absence is complete without manufacturing homework.
@@ -92,11 +92,29 @@ test(
         },
       });
       for (const kind of ["MEMORIZATION", "REVIEW"])
-        await post({ action: "assessment", kind, assessment: "NOT_MASTERED" });
+        for (const assessment of ["MASTERED", "NOT_MASTERED"])
+          await assert.rejects(
+            () => post({ action: "assessment", kind, assessment }),
+            /سجل مدى التسميع/,
+          );
+      assert.equal((await read()).entries.length, 0);
+      for (const kind of ["MEMORIZATION", "REVIEW"])
+        await post({
+          action: "entry",
+          kind,
+          assessment: "NOT_MASTERED",
+          range,
+          requestKey: randomUUID(),
+        });
       let saved = await read();
       assert.equal(saved.outcome, "NOT_MEMORIZED");
-      assert.equal(saved.entries.length, 0);
-      assert.equal(totalPages(saved.entries), 0);
+      assert.equal(saved.entries.length, 2);
+      assert.ok(
+        saved.entries.every(
+          (e) => e.assessment === "NOT_MASTERED" && e.endAyah === 10,
+        ),
+      );
+      assert.equal(totalPages(saved.entries), totalPages([range, range]));
       assert.deepEqual(reportIssues(saved), []);
       assert.deepEqual(saved.tomorrow?.memorization, range);
       const automaticOrigin = saved.tomorrow?.autoMemorizationStatusId;
@@ -120,15 +138,6 @@ test(
         assessment: "NOT_MASTERED",
       });
       assert.deepEqual((await read()).tomorrow?.memorization, manual);
-      await assert.rejects(
-        () =>
-          post({
-            action: "assessment",
-            kind: "REVIEW",
-            assessment: "MASTERED",
-          }),
-        /سجل مدى التسميع/,
-      );
 
       // Actual independent ranges, summed from the server's Quran calculation.
       for (const kind of ["MEMORIZATION", "REVIEW"] as const) {
@@ -146,26 +155,28 @@ test(
         }
       }
       saved = await read();
-      assert.equal(saved.entries.length, 6);
+      assert.equal(saved.entries.length, 8);
       assert.equal(
         totalPages(saved.entries.filter((e) => e.kind === "MEMORIZATION")),
-        totalPages(
-          [0, 1, 2].map((i) => ({
+        totalPages([
+          range,
+          ...[0, 1, 2].map((i) => ({
             ...range,
             startAyah: i * 3 + 1,
             endAyah: i * 3 + 3,
           })),
-        ),
+        ]),
       );
       assert.equal(
         totalPages(saved.entries.filter((e) => e.kind === "REVIEW")),
-        totalPages(
-          [0, 1, 2].map((i) => ({
+        totalPages([
+          range,
+          ...[0, 1, 2].map((i) => ({
             ...range,
             startAyah: i * 3 + 1,
             endAyah: i * 3 + 3,
           })),
-        ),
+        ]),
       );
       for (const entry of saved.entries)
         assert.equal(entry.pageAmount, pageAmount(entry)!.amount);
@@ -186,7 +197,7 @@ test(
       assert.equal(saved.note, "متزامن");
       assert.equal(saved.outcome, "NOT_MEMORIZED");
       assert.deepEqual(saved.tomorrow?.memorization, manual);
-      assert.equal(saved.entries.length, 6);
+      assert.equal(saved.entries.length, 8);
       await ensureDay(teacher.id, halqa.id, nextDay(date));
       const next = (await getDay(teacher.id, halqa.id, nextDay(date)))
         .students[0];
