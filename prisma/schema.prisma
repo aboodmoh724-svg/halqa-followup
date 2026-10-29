@@ -59,6 +59,7 @@ model Enrollment {
   position Int @default(0)
   dailyStatuses DailyStudentStatus[]
   assignments Assignment[]
+  memorizationSequence MemorizationSequence?
   @@unique([studentId, halqaId])
   @@unique([id, halqaId])
   @@index([halqaId, active])
@@ -96,6 +97,8 @@ enum RangeDirection {
   REVERSE
 }
 model RecitationEntry {
+  // Teacher correction for progression; assessment retains the original attempt result.
+  masteryResult String?
   direction RangeDirection @default(FORWARD)
   id String @id @default(cuid())
   dailyStatusId String
@@ -149,4 +152,16 @@ model SupervisorSession {
   supervisor Supervisor @relation(fields: [supervisorId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   @@index([expiresAt])
+}
+
+model MemorizationSequence {
+  id String @id @default(cuid())
+  enrollmentId String @unique
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  startSurah Int
+  startAyah Int
+  initialDirection RangeDirection?
+  anchorEntryId String?
+  anchorMastered Boolean @default(false)
+  createdAt DateTime @default(now())
 }

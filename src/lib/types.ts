@@ -1,3 +1,4 @@
+import type { MemorySequenceView } from "./memorization-order";
 import { z } from "zod";
 import { rangeSchema, type QuranRange } from "./quran";
 export const labels = {
@@ -46,6 +47,7 @@ export type EntryView = QuranRange & {
   pageMappingVersion: string | null;
 };
 export type StudentView = {
+  memorySequence?: MemorySequenceView;
   reviewOnly?: boolean;
   suggestions?: {
     memorization: AssignmentSuggestion | null;

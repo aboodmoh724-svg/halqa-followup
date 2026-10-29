@@ -13,6 +13,12 @@ import {
   type Assessment,
   type StudentView,
 } from "@/lib/types";
+import {
+  nextMemoryRange,
+  validateMemoryCandidate,
+  type MemorySequenceView,
+  inferMemoryDirection,
+} from "@/lib/memorization-order";
 export type Mode =
   | "edit-entry"
   | "memory"
@@ -32,17 +38,44 @@ function RangeFields({
   title,
   value,
   onChange,
+  memorySequence,
+  memorization = false,
 }: {
   title: string;
   value: QuranRange;
   onChange: (r: QuranRange) => void;
+  memorySequence?: MemorySequenceView;
+  memorization?: boolean;
 }) {
   const id = title.replaceAll(" ", "-");
+  const direction =
+    memorySequence?.direction ??
+    (memorization &&
+    memorySequence &&
+    !memorySequence.next &&
+    memorySequence.adjacentSurahs.includes(value.startSurah)
+      ? value.startSurah > memorySequence.start.surah
+        ? "FORWARD"
+        : "REVERSE"
+      : memorization && value.startSurah
+        ? inferMemoryDirection({
+            ...value,
+            endSurah: value.startSurah,
+            endAyah: value.startAyah,
+          })
+        : null);
   function surahChange(side: "start" | "end", n: number) {
     const next = {
       ...value,
       [`${side}Surah`]: n,
       [`${side}Ayah`]: Math.min(value[`${side}Ayah`], surahs[n - 1].ayahs),
+      ...(side === "start" &&
+      (value.startSurah === value.endSurah ||
+        !value.endSurah ||
+        (memorySequence?.direction === "FORWARD" && value.endSurah < n) ||
+        (memorySequence?.direction === "REVERSE" && value.endSurah > n))
+        ? { endSurah: n, endAyah: Math.min(value.endAyah, surahs[n - 1].ayahs) }
+        : {}),
     };
     onChange(next);
   }
@@ -58,11 +91,46 @@ function RangeFields({
                 value={value[`${side}Surah`]}
                 onChange={(e) => surahChange(side, Number(e.target.value))}
               >
-                {surahs.map((s) => (
-                  <option value={s.id} key={s.id}>
-                    {s.name}
+                {!value[`${side}Surah`] && (
+                  <option value={0} disabled>
+                    اختر السورة
                   </option>
-                ))}
+                )}
+                {surahs
+                  .filter(
+                    (s) =>
+                      !memorization ||
+                      side === "start" ||
+                      !value.startSurah ||
+                      !direction ||
+                      (direction === "FORWARD"
+                        ? s.id >= value.startSurah
+                        : s.id <= value.startSurah),
+                  )
+                  .map((s) => (
+                    <option
+                      value={s.id}
+                      key={s.id}
+                      disabled={
+                        side === "start" &&
+                        !!memorySequence &&
+                        !memorySequence.problem &&
+                        !memorySequence.complete &&
+                        (memorySequence.direction && memorySequence.next
+                          ? memorySequence.direction === "FORWARD"
+                            ? s.id < memorySequence.start.surah ||
+                              s.id > memorySequence.next.surah
+                            : s.id > memorySequence.start.surah ||
+                              s.id < memorySequence.next.surah
+                          : memorySequence.next
+                            ? s.id !== memorySequence.next.surah
+                            : s.id !== memorySequence.start.surah &&
+                              !memorySequence.adjacentSurahs.includes(s.id))
+                      }
+                    >
+                      {s.name}
+                    </option>
+                  ))}
               </select>
             </label>
             <label>
@@ -72,7 +140,7 @@ function RangeFields({
                 type="number"
                 inputMode="numeric"
                 min={1}
-                max={surahs[value[`${side}Surah`] - 1].ayahs}
+                max={surahs[value[`${side}Surah`] - 1]?.ayahs ?? 1}
                 step={1}
                 list={`${id}-${side}`}
                 value={value[`${side}Ayah`] || ""}
@@ -85,7 +153,7 @@ function RangeFields({
               />
               <datalist id={`${id}-${side}`}>
                 {Array.from(
-                  { length: surahs[value[`${side}Surah`] - 1].ayahs },
+                  { length: surahs[value[`${side}Surah`] - 1]?.ayahs ?? 1 },
                   (_, i) => (
                     <option key={i} value={i + 1} />
                   ),
@@ -101,6 +169,21 @@ function RangeFields({
           الأصغر إلى الأكبر.
         </p>
       )}
+      {rangeSchema.safeParse(value).success &&
+        memorySequence &&
+        validateMemoryCandidate(memorySequence, value) && (
+          <p className="notice" role="status">
+            {validateMemoryCandidate(memorySequence, value)}
+          </p>
+        )}
+      {value.startSurah !== value.endSurah &&
+        !!value.startSurah &&
+        !!value.endSurah && (
+          <p className="subtle">
+            يشمل المدى جميع الآيات والسور بين البداية والنهاية، دون تجاوز ما
+            بينها.
+          </p>
+        )}
       {rangeSchema.safeParse(value).success && (
         <p className="range-amount" aria-live="polite">
           المقدار: {amountText(value)}
@@ -129,13 +212,13 @@ export default function Sheet({
   const dialog = useRef<HTMLDialogElement>(null);
   const [range, setRange] = useState(
     entry ??
-      student.today?.[mode === "review" ? "review" : "memorization"] ??
-      initialRange,
+      (mode === "memory"
+        ? nextMemoryRange(student.memorySequence, student.today?.memorization)
+        : (student.today?.review ?? initialRange)),
   );
   const [memory, setMemory] = useState(
     student.tomorrow?.memorization ??
-      student.today?.memorization ??
-      initialRange,
+      nextMemoryRange(student.memorySequence, student.today?.memorization),
   );
   const [review, setReview] = useState(
     student.tomorrow?.review ?? student.today?.review ?? initialRange,
@@ -244,6 +327,16 @@ export default function Sheet({
         setError(result.error.issues[0].message);
         return;
       }
+      if (!isReview && student.memorySequence) {
+        const problem = validateMemoryCandidate(
+          student.memorySequence,
+          result.data,
+        );
+        if (problem) {
+          setError(problem);
+          return;
+        }
+      }
       data = {
         action: "entry",
         assessment,
@@ -263,6 +356,13 @@ export default function Sheet({
             return;
           }
         }
+      if (memoryEnabled && student.memorySequence) {
+        const problem = validateMemoryCandidate(student.memorySequence, memory);
+        if (problem) {
+          setError(problem);
+          return;
+        }
+      }
       if (
         !memoryEnabled &&
         !reviewEnabled &&
@@ -327,9 +427,18 @@ export default function Sheet({
             <p className="notice">
               {resultOnly
                 ? "تعديل النتيجة فقط؛ لن يضاف تسميع جديد أو صفحات أخرى."
-                : student.today?.[mode === "review" ? "review" : "memorization"]
-                  ? "تم تعبئة واجب اليوم. عدّل المدى حسب التسميع الفعلي."
-                  : "حدد ما سمعه الطالب في هذه المرة."}
+                : mode === "memory" && student.memorySequence
+                  ? (student.memorySequence.problem ??
+                    (student.memorySequence.complete
+                      ? "وصل الطالب إلى نهاية تتابع الحفظ المسجل؛ المراجعة متاحة."
+                      : student.memorySequence.next
+                        ? `الموضع التالي: ${surahs[student.memorySequence.next.surah - 1].name}، الآية ${student.memorySequence.next.ayah}. حدد نهاية ما سمعه الطالب فعليًا دون تجاوز آيات غير مكتملة.`
+                        : "اكتمل تسميع السورة المسجلة. اختر السورة المجاورة وفق ترتيب الطالب؛ سيُعرف الاتجاه تلقائيًا."))
+                  : student.today?.[
+                        mode === "review" ? "review" : "memorization"
+                      ]
+                    ? "تم تعبئة واجب اليوم. عدّل المدى حسب التسميع الفعلي."
+                    : "حدد ما سمعه الطالب في هذه المرة."}
             </p>
             <fieldset className="assessment-picker">
               <legend>نتيجة {isReview ? "المراجعة" : "الحفظ"}</legend>
@@ -366,6 +475,10 @@ export default function Sheet({
                   title="مدى التسميع"
                   value={range}
                   onChange={setRange}
+                  memorySequence={
+                    mode === "memory" ? student.memorySequence : undefined
+                  }
+                  memorization={mode === "memory"}
                 />
               )}
           </>
@@ -479,6 +592,10 @@ export default function Sheet({
                           title={`مدى ${label}`}
                           value={isMemory ? memory : review}
                           onChange={isMemory ? setMemory : setReview}
+                          memorySequence={
+                            isMemory ? student.memorySequence : undefined
+                          }
+                          memorization={isMemory}
                         />
                       )}
                       {saved && (

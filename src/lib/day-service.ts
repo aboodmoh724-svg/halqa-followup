@@ -10,6 +10,12 @@ import {
   type AssignmentView,
 } from "./types";
 import { rangeSchema, pageAmount } from "./quran";
+import {
+  ensureMemorySequence,
+  enforceMemorySequence,
+  readMemorySequences,
+} from "./memorization-sequence";
+import { validateMemoryCandidate } from "./memorization-order";
 import { suggestAssignment } from "./assignment-suggestions";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -157,6 +163,11 @@ export async function getDay(
     });
     histories.set(h.enrollmentId, days);
   }
+  const memorySequences = await readMemorySequences(
+    db,
+    session.statuses.filter((s) => !s.reviewOnly).map((s) => s.enrollmentId),
+    date,
+  );
   return {
     halqaId,
     halqaName: session.halqa.name,
@@ -167,6 +178,7 @@ export async function getDay(
     readOnlyReason: dayReadOnlyReason(date),
     students: session.statuses.map((s) => ({
       enrollmentId: s.enrollmentId,
+      memorySequence: memorySequences.get(s.enrollmentId),
       reviewOnly: s.reviewOnly,
       suggestions: {
         memorization:
@@ -174,10 +186,18 @@ export async function getDay(
           s.outcome === "ABSENT" ||
           s.memorizationResult === "NOT_MASTERED"
             ? null
-            : suggestAssignment(
-                histories.get(s.enrollmentId) ?? [],
-                "MEMORIZATION",
-              ),
+            : (() => {
+                const proposal = suggestAssignment(
+                  histories.get(s.enrollmentId) ?? [],
+                  "MEMORIZATION",
+                );
+                const sequence = memorySequences.get(s.enrollmentId);
+                return proposal &&
+                  sequence &&
+                  validateMemoryCandidate(sequence, proposal.range)
+                  ? null
+                  : proposal;
+              })(),
         review:
           s.outcome === "ABSENT" || s.reviewResult === "NOT_MASTERED"
             ? null
@@ -296,6 +316,22 @@ export async function mutateDay(
         (m.action === "assignment" && m.memorization != null))
     )
       throw new HttpError(409, "الطالب حافظ؛ مساره مراجعة فقط دون حفظ جديد");
+    const memoryChange =
+      m.action === "entry" || m.action === "assessment"
+        ? m.kind === "MEMORIZATION"
+        : m.action === "edit-entry"
+          ? status.entries.some(
+              (e) => e.id === m.entryId && e.kind === "MEMORIZATION",
+            )
+          : m.action === "assignment" && m.memorization != null;
+    const memoryPath = memoryChange
+      ? await ensureMemorySequence(
+          tx,
+          m.enrollmentId,
+          m.date,
+          m.action === "entry" ? m.range : undefined,
+        )
+      : null;
     if (m.action === "edit-entry") {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل تعديل التسميع");
@@ -353,12 +389,28 @@ export async function mutateDay(
           throw new HttpError(409, "طلب مكرر غير صحيح");
         return;
       }
+      if (m.kind === "MEMORIZATION") {
+        const previous = [...status.entries]
+          .reverse()
+          .find((e) => e.kind === "MEMORIZATION");
+        if (
+          previous &&
+          !previous.masteryResult &&
+          (status.memorizationResult === "MASTERED" ||
+            status.memorizationResult === "NOT_MASTERED")
+        )
+          await tx.recitationEntry.update({
+            where: { id: previous.id },
+            data: { masteryResult: status.memorizationResult },
+          });
+      }
       const pages = pageAmount(m.range)!;
       await tx.recitationEntry.create({
         data: {
           dailyStatusId: status.id,
           kind: m.kind,
           assessment: m.assessment,
+          ...(m.kind === "MEMORIZATION" ? { masteryResult: m.assessment } : {}),
           ...m.range,
           direction: m.range.direction ?? "FORWARD",
           requestKey: m.requestKey,
@@ -376,6 +428,16 @@ export async function mutateDay(
     if (m.action === "assessment" || (m.action === "entry" && m.assessment)) {
       if (status.outcome === "ABSENT")
         throw new HttpError(409, "ألغِ الغياب أولًا قبل تسجيل النتيجة");
+      if (m.action === "assessment" && m.kind === "MEMORIZATION") {
+        const last = [...status.entries]
+          .reverse()
+          .find((e) => e.kind === "MEMORIZATION");
+        if (last)
+          await tx.recitationEntry.update({
+            where: { id: last.id },
+            data: { masteryResult: m.assessment },
+          });
+      }
       const memory =
         m.kind === "MEMORIZATION" ? m.assessment! : status.memorizationResult;
       const review = m.kind === "REVIEW" ? m.assessment! : status.reviewResult;
@@ -572,6 +634,18 @@ export async function mutateDay(
         update: data,
       });
     }
+    if (memoryPath)
+      await enforceMemorySequence(
+        tx,
+        memoryPath,
+        m.date,
+        m.action === "edit-entry"
+          ? { id: m.entryId, range: m.range }
+          : undefined,
+        m.action === "assignment" && m.memorization
+          ? m.memorization
+          : undefined,
+      );
   });
   return getDay(teacherId, halqaId);
 }

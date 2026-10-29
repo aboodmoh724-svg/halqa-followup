@@ -152,7 +152,7 @@ try {
           data: {
             sessionId: session.id,
             halqaId: scheduleDay.halqaId,
-            enrollmentId: scheduleDay.students[0].enrollmentId,
+            enrollmentId: scheduleDay.students[2].enrollmentId,
             outcome: "MEMORIZED",
             memorizationResult: "MASTERED",
             reviewResult: "MASTERED",
@@ -178,7 +178,7 @@ try {
       .getByRole("button", { name: "تحديث اليوم", exact: true })
       .click();
     await page.locator('main[aria-busy="false"]').waitFor();
-    await page.getByRole("button", { name: /محمد أحمد علي/ }).click();
+    await page.getByRole("button", { name: /عمر محمود حسن/ }).click();
     await page
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
@@ -203,6 +203,8 @@ try {
     ).json();
     assert.equal(untouched.students[0].entries.length, 0);
     assert.equal(untouched.students[0].tomorrow, null);
+    await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
+    await page.getByRole("button", { name: /محمد أحمد علي/ }).click();
     await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
     const dialog = page.getByRole("dialog");
     assert.equal(
@@ -225,6 +227,17 @@ try {
       .click();
     await dialog.waitFor({ state: "hidden" });
     await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
+    assert.equal(
+      await dialog.getByRole("spinbutton").nth(0).inputValue(),
+      "18",
+    );
+    assert(
+      await dialog
+        .getByRole("combobox")
+        .first()
+        .locator('option[value="68"]')
+        .evaluate((option) => option.disabled),
+    );
     await dialog.getByRole("spinbutton").nth(0).fill("18");
     await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
     await dialog
@@ -320,7 +333,7 @@ try {
       await dialog.getByRole("spinbutton").nth(1).inputValue(),
       "17",
     );
-    await dialog.getByRole("spinbutton").nth(1).fill("16");
+    await dialog.getByRole("spinbutton").nth(1).fill("18");
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     const edited = await (await context.request.get(url)).json();
@@ -329,9 +342,9 @@ try {
       edited.students[0].entries[0].id,
       day.students[0].entries[0].id,
     );
-    assert.equal(edited.students[0].entries[0].endAyah, 16);
+    assert.equal(edited.students[0].entries[0].endAyah, 18);
     assert.ok(
-      edited.students[0].entries[0].pageAmount <
+      edited.students[0].entries[0].pageAmount >
         day.students[0].entries[0].pageAmount,
     );
     assert.equal(edited.students[0].memorizationResult, "MASTERED");
@@ -392,9 +405,9 @@ try {
     assert.equal(corrected.students[0].entries.length, 3);
     assert.deepEqual(corrected.students[0].tomorrow.memorization, {
       startSurah: 67,
-      startAyah: 10,
+      startAyah: 21,
       endSurah: 67,
-      endAyah: 20,
+      endAyah: 21,
     });
     await page
       .getByRole("button", { name: "+ واجب الغد", exact: true })
@@ -404,6 +417,11 @@ try {
       .getByRole("button", { name: "تعديل واجب الحفظ", exact: true })
       .click();
     await page.screenshot({ path: "work/smoke/automatic-assignment.png" });
+    await dialog
+      .getByRole("group", { name: "مدى الحفظ" })
+      .getByRole("spinbutton")
+      .nth(0)
+      .fill("18");
     await dialog
       .getByRole("group", { name: "مدى الحفظ" })
       .getByRole("spinbutton")
