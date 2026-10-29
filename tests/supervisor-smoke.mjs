@@ -306,6 +306,43 @@ try {
     .click();
   await report.getByText(/لا يوجد طلاب مطابقون للشروط/).waitFor();
   await report
+    .getByLabel("١. نوع التقرير", { exact: true })
+    .selectOption("support");
+  await report.getByText(/معيار المدرسة للحفظ الجديد المتقن/).waitFor();
+  assert.equal(
+    await report.getByLabel("إتقان أقل من (%)", { exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await report
+      .getByRole("option", { name: "هذا الشهر", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await report.getByLabel("٢. الفترة", { exact: true }).inputValue(),
+    "previous-week",
+  );
+  await report
+    .getByRole("button", { name: "معاينة التقرير", exact: true })
+    .click();
+  await report.getByText(/لم يُصنف .*طالبًا لعدم كفاية بيانات/).waitFor();
+  const supportLink = report.getByRole("link", {
+    name: "تنزيل التقرير PDF",
+    exact: true,
+  });
+  const supportResponse = await context.request.get(
+    new URL(await supportLink.getAttribute("href"), base).href,
+    { timeout: 90000 },
+  );
+  assert.equal(supportResponse.status(), 200);
+  const supportBuffer = await supportResponse.body();
+  assert(pdfPages(supportBuffer).every((p) => p.height > p.width));
+  await writeFile("work/smoke/support-page-policy.pdf", supportBuffer);
+  await report
+    .getByLabel("١. نوع التقرير", { exact: true })
+    .selectOption("excellent");
+  await report
     .getByLabel("٢. الفترة", { exact: true })
     .selectOption("previous-month");
   await report

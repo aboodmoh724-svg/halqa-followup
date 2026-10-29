@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       return Response.json(
         {
           error:
-            "تحقق من نوع التقرير والتواريخ والشروط، واختر فترة لا تتجاوز ٩٣ يومًا.",
+            "تحقق من التواريخ والشروط. تقرير المتابعة يحتاج أسبوعًا كاملًا من الاثنين إلى الجمعة؛ بقية التقارير لا تتجاوز 93 يومًا.",
         },
         { status: 400, headers: { "Cache-Control": "no-store" } },
       );

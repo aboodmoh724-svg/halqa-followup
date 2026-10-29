@@ -1,3 +1,9 @@
+import {
+  memoryDayEvidence,
+  weeklyMinimumPages,
+  weeklySupportReason,
+} from "./weekly-support-policy";
+import { roundPages } from "./madani";
 import { db } from "./db";
 import { HttpError } from "./auth";
 import {
@@ -22,7 +28,9 @@ export async function getSupervisionReport(raw: unknown) {
   const query =
     parsed.type === "comprehensive"
       ? { ...parsed, halqaId: undefined, enrollmentId: undefined }
-      : parsed;
+      : parsed.type === "support"
+        ? { ...parsed, enrollmentId: undefined }
+        : parsed;
   if (query.to > dayKey())
     throw new HttpError(400, "لا يمكن إصدار تقرير بتاريخ مستقبلي");
   return db.$transaction(
@@ -51,7 +59,7 @@ export async function getSupervisionReport(raw: unknown) {
         where: {
           id: {
             notIn: excluded,
-            ...(query.halqaId && !selectedStudent
+            ...(query.halqaId && !selectedStudent && query.type !== "support"
               ? { equals: query.halqaId }
               : {}),
           },
@@ -89,7 +97,7 @@ export async function getSupervisionReport(raw: unknown) {
         },
       });
       classes.sort(schoolClassCompare);
-      if (query.halqaId && !classes.length)
+      if (query.halqaId && !classes.some((h) => h.id === query.halqaId))
         throw new HttpError(404, "الحلقة غير موجودة في التقرير");
       if (
         query.type === "student" &&
@@ -273,7 +281,20 @@ export async function getSupervisionReport(raw: unknown) {
             },
             query,
           );
+          const memoryEvidence = e.dailyStatuses.map((s) => ({
+            date: s.session.date.toISOString().slice(0, 10),
+            ...memoryDayEvidence(s),
+          }));
           return {
+            masteredMemoryPages: roundPages(
+              memoryEvidence
+                .filter((d) => studyDates.includes(d.date))
+                .reduce((n, d) => n + d.pages, 0),
+            ),
+            memoryEvidenceDates: memoryEvidence
+              .filter((d) => d.known && expectedDates.includes(d.date))
+              .map((d) => d.date),
+            weeklyMinimumPages: null as 2 | 5 | null,
             expectedStudyDays: expectedDates.length,
             recordedStudyDays: days.filter(
               (d) => expectedDates.includes(d.date) && d.recorded,
@@ -285,6 +306,8 @@ export async function getSupervisionReport(raw: unknown) {
               (date) => !days.some((d) => d.date === date && d.recorded),
             ).length,
             enrollmentId: e.id,
+            historyEnrollmentId: e.id,
+            historyHalqaId: h.id,
             name: e.student.name,
             halqaId: h.id,
             halqaName: h.name,
@@ -366,7 +389,7 @@ export async function getSupervisionReport(raw: unknown) {
           total[key] += row[key];
         aggregate.set(id, total);
       }
-      const rows = eligibleRows
+      let rows = eligibleRows
         .map((row) => ({
           ...row,
           reasons: reportReasons(
@@ -379,6 +402,78 @@ export async function getSupervisionReport(raw: unknown) {
             ["comprehensive", "student"].includes(query.type) ||
             row.reasons.length > 0,
         );
+      let supportUnassessedCount = 0;
+      if (query.type === "support") {
+        const endRoster = rosters.get(query.to)!;
+        const grouped = new Map<string, typeof eligibleRows>();
+        for (const row of eligibleRows) {
+          const id = studentIds.get(row.enrollmentId)!;
+          grouped.set(id, [...(grouped.get(id) ?? []), row]);
+        }
+        rows = [];
+        for (const group of grouped.values()) {
+          const end = group.find((r) => endRoster.has(r.enrollmentId));
+          if (!end || (query.halqaId && end.halqaId !== query.halqaId))
+            continue;
+          if (end.reviewOnly) continue;
+          const minimum = weeklyMinimumPages(end.halqaName),
+            known = new Set(group.flatMap((r) => r.memoryEvidenceDates));
+          if (minimum === null || studyDates.some((d) => !known.has(d))) {
+            supportUnassessedCount++;
+            continue;
+          }
+          const mastered = roundPages(
+            group.reduce((n, r) => n + r.masteredMemoryPages, 0),
+          );
+          const reason = weeklySupportReason(mastered, minimum);
+          if (!reason) continue;
+          const merged = { ...end };
+          const current = baseRows.find(
+            (r) =>
+              r.active &&
+              studentIds.get(r.enrollmentId) ===
+                studentIds.get(end.enrollmentId),
+          );
+          if (current) {
+            merged.historyEnrollmentId = current.enrollmentId;
+            merged.historyHalqaId = current.halqaId;
+          }
+          for (const key of [
+            "expectedStudyDays",
+            "recordedStudyDays",
+            "completedStudyDays",
+            "missingStudyDays",
+            "memoryAssessedDays",
+            "memoryMasteredDays",
+            "reviewAssessedDays",
+            "reviewMasteredDays",
+            "recordedDays",
+            "presentDays",
+            "assessedDays",
+            "masteredDays",
+            "notMasteredDays",
+            "absentDays",
+            "pendingDays",
+            "memoryPages",
+            "reviewPages",
+          ] as const)
+            merged[key] = group.reduce((n, r) => n + r[key], 0);
+          merged.masteredMemoryPages = mastered;
+          merged.weeklyMinimumPages = minimum;
+          merged.memoryEvidenceDates = [...known].sort();
+          merged.absentDates = [
+            ...new Set(group.flatMap((r) => r.absentDates)),
+          ].sort();
+          merged.weeklyNotes = group
+            .flatMap((r) => r.weeklyNotes)
+            .sort((a, b) => a.date.localeCompare(b.date));
+          merged.latestNote = merged.weeklyNotes.at(-1)?.note ?? "";
+          merged.masteryRate = merged.assessedDays
+            ? Math.round((merged.masteredDays / merged.assessedDays) * 100)
+            : null;
+          rows.push({ ...merged, reasons: [reason] });
+        }
+      }
       const sum = (
         items: typeof rows,
         key:
@@ -393,6 +488,7 @@ export async function getSupervisionReport(raw: unknown) {
           | "absentDays"
           | "recordedDays"
           | "presentDays"
+          | "masteredMemoryPages"
           | "memoryPages"
           | "reviewPages",
       ) => items.reduce((n, r) => n + r[key], 0);
@@ -442,6 +538,7 @@ export async function getSupervisionReport(raw: unknown) {
         rows,
         classes: classSummaries,
         studyDays: studyDates.length,
+        supportUnassessedCount,
         summary: {
           expectedStudyDays: sum(rows, "expectedStudyDays"),
           recordedStudyDays: sum(rows, "recordedStudyDays"),
@@ -458,6 +555,7 @@ export async function getSupervisionReport(raw: unknown) {
           assessedDays: rows.reduce((n, r) => n + r.assessedDays, 0),
           absentDays: rows.reduce((n, r) => n + r.absentDays, 0),
           pendingDays: rows.reduce((n, r) => n + r.pendingDays, 0),
+          masteredMemoryPages: sum(rows, "masteredMemoryPages"),
           memoryPages: rows.reduce((n, r) => n + r.memoryPages, 0),
           reviewPages: rows.reduce((n, r) => n + r.reviewPages, 0),
         },
