@@ -61,7 +61,7 @@ test("review-only completion depends on review, without introducing an activity 
       reviewResult: "NOT_MASTERED",
       outcome: "NOT_MEMORIZED",
     }),
-    [],
+    ["مدى المراجعة"],
   );
   assert.deepEqual(
     reportIssues({
@@ -208,14 +208,25 @@ test(
           }),
         /حدد مدى المراجعة/,
       );
+      await assert.rejects(
+        () =>
+          post({
+            action: "assessment",
+            kind: "REVIEW",
+            assessment: "NOT_MASTERED",
+          }),
+        /سجل مدى التسميع/,
+      );
       await post({
-        action: "assessment",
+        action: "entry",
         kind: "REVIEW",
         assessment: "NOT_MASTERED",
+        range,
+        requestKey: randomUUID(),
       });
       saved = await read();
       assert.equal(saved.outcome, "NOT_MEMORIZED");
-      assert.equal(saved.entries.length, 0);
+      assert.equal(saved.entries.length, 1);
       assert.deepEqual(reportIssues(saved), []);
       await assert.rejects(() => post({ action: "track", reviewOnly: false }), {
         name: "ZodError",
@@ -232,7 +243,7 @@ test(
         await post(entry);
       }
       saved = await read();
-      assert.equal(saved.entries.length, 2);
+      assert.equal(saved.entries.length, 3);
       assert.equal(saved.memorizationResult, null);
       assert.equal(saved.outcome, "MEMORIZED");
       assert.equal(saved.suggestions?.memorization, null);

@@ -247,9 +247,14 @@ try {
     await page.getByRole("button", { name: "+ مراجعة", exact: true }).click();
     assert.equal(await dialog.getByRole("combobox").nth(0).inputValue(), "68");
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
-    await dialog
-      .getByLabel("سمّع الطالب شيئًا وأريد تسجيله", { exact: true })
-      .check();
+    assert.equal(
+      await dialog
+        .getByLabel("سمّع الطالب شيئًا وأريد تسجيله", { exact: true })
+        .count(),
+      0,
+    );
+    assert.equal(await dialog.getByRole("combobox").nth(0).inputValue(), "68");
+    assert.equal(await dialog.getByRole("spinbutton").count(), 2);
     await dialog
       .getByRole("button", { name: "حفظ التسجيل", exact: true })
       .click();
@@ -513,7 +518,13 @@ try {
       0,
     );
     assert.equal(await dialog.getByLabel("سمّع الطالب آيات اليوم").count(), 0);
+    await dialog.getByRole("combobox").nth(0).selectOption("67");
+    await dialog.getByRole("spinbutton").nth(0).fill("1");
+    await dialog.getByRole("spinbutton").nth(1).fill("10");
+    await dialog.getByRole("button", { name: "حافظ", exact: true }).click();
     await dialog.getByRole("button", { name: "غير حافظ", exact: true }).click();
+    assert.equal(await dialog.getByRole("combobox").nth(0).inputValue(), "67");
+    assert.equal(await dialog.getByRole("spinbutton").nth(1).inputValue(), "10");
     await dialog
       .getByRole("button", { name: "حفظ التسجيل", exact: true })
       .click();
@@ -525,11 +536,13 @@ try {
       .click();
     await dialog.waitFor({ state: "hidden" });
     const after = await (await context.request.get(url)).json();
-    assert.equal(after.students[1].entries.length, 1);
+    assert.equal(after.students[1].entries.length, 2);
+    assert.equal(after.students[1].entries[0].assessment, "NOT_MASTERED");
+    assert.equal(after.students[1].entries[0].endAyah, 10);
     assert.equal(after.students[1].memorizationResult, "NOT_MASTERED");
     assert.equal(after.students[1].reviewResult, "MASTERED");
     await page.screenshot({
-      path: "work/smoke/no-recitation-result.png",
+      path: "work/smoke/not-mastered-range.png",
       fullPage: true,
     });
     // A hafiz can complete the day by recording review alone.

@@ -154,12 +154,14 @@ export function reportIssues(
     issues.push("نتيجة المراجعة");
   if (
     !student.reviewOnly &&
-    student.memorizationResult === "MASTERED" &&
+    (student.memorizationResult === "MASTERED" ||
+      (!legacyClosed && student.memorizationResult === "NOT_MASTERED")) &&
     !student.entries.some((e) => e.kind === "MEMORIZATION")
   )
     issues.push("مدى الحفظ الجديد");
   if (
-    student.reviewResult === "MASTERED" &&
+    (student.reviewResult === "MASTERED" ||
+      (!legacyClosed && student.reviewResult === "NOT_MASTERED")) &&
     !student.entries.some((e) => e.kind === "REVIEW")
   )
     issues.push("مدى المراجعة");

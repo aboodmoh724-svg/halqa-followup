@@ -421,7 +421,6 @@ export async function mutateDay(
     }
     if (
       m.action === "assessment" &&
-      m.assessment === "MASTERED" &&
       !status.entries.some((e) => e.kind === m.kind)
     )
       throw new HttpError(409, "سجل مدى التسميع أولًا قبل تعديل النتيجة");

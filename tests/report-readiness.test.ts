@@ -49,14 +49,18 @@ test("first-day absence needs neither homework nor recitation nor assessment", (
   assert.deepEqual(reportIssues({ ...absent, tomorrow: null }), []);
 });
 
-test("غير حافظ without recitation completes the day without invented pages or required amount", () => {
+test("غير حافظ requires a recorded range for both activities; legacy closed reports remain readable", () => {
   const noRecitation: StudentView = {
     ...student,
     memorizationResult: "NOT_MASTERED",
     reviewResult: "NOT_MASTERED",
     entries: [],
   };
-  assert.deepEqual(reportIssues(noRecitation), []);
+  assert.deepEqual(reportIssues(noRecitation), [
+    "مدى الحفظ الجديد",
+    "مدى المراجعة",
+  ]);
+  assert.deepEqual(reportIssues(noRecitation, true), []);
   const day: DayView = {
     halqaId: "h",
     halqaName: "حلقة",
