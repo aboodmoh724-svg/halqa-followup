@@ -32,6 +32,8 @@ export function independentSummary(
 export type AssignmentView = {
   autoMemorizationStatusId?: string | null;
   memorizationManual?: boolean;
+  autoReviewStatusId?: string | null;
+  reviewManual?: boolean;
   id: string;
   memorization: QuranRange | null;
   review: QuranRange | null;

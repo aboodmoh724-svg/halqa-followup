@@ -222,10 +222,11 @@ export default function TeacherFlow() {
         (s) => s.enrollmentId === data.enrollmentId,
       );
       notify(
-        data.kind === "MEMORIZATION" &&
-          data.assessment === "NOT_MASTERED" &&
-          saved?.tomorrow?.autoMemorizationStatusId
-          ? "تم الحفظ وإضافة الدرس غير المحفوظ إلى واجب الغد"
+        data.assessment === "NOT_MASTERED" &&
+          (data.kind === "MEMORIZATION"
+            ? saved?.tomorrow?.autoMemorizationStatusId
+            : saved?.tomorrow?.autoReviewStatusId)
+          ? `تم الحفظ وترحيل ${data.kind === "MEMORIZATION" ? "الحفظ" : "المراجعة"} إلى واجب الغد`
           : "تم الحفظ",
       );
       return true;
@@ -980,8 +981,9 @@ export default function TeacherFlow() {
                 استخدم بطاقة نتائج اليوم؛ لا تُضاف صفحات جديدة.
               </li>
               <li>
-                إذا كان الطالب غير حافظ للدرس الجديد، يُضاف الدرس تلقائيًا إلى
-                واجب الغد، ويمكنك تعديل الواجب.
+                إذا كان الطالب غير حافظ في الحفظ أو المراجعة، يرحّل مدى ذلك
+                النشاط إلى واجب الغد، ويمكنك تعديله. لا يُستبدل اختيارك اليدوي
+                تلقائيًا.
               </li>
               <li>
                 للغياب زر واحد؛ ينقل واجب اليوم إلى الغد إن وُجد، ولا يطلب

@@ -508,8 +508,21 @@ export default function Sheet({
               student.memorizationResult === "NOT_MASTERED" &&
               student.tomorrow?.memorizationManual && (
                 <p className="notice">
-                  الطالب غير حافظ الدرس الجديد. أبقينا واجب الغد الذي حددته
-                  يدويًا؛ يمكنك تغييره هنا.
+                  الطالب غير حافظ الدرس الجديد. أبقينا اختيارك اليدوي لواجب
+                  الحفظ؛ يمكنك تغييره هنا.
+                </p>
+              )}
+            {student.tomorrow?.autoReviewStatusId && (
+              <p className="notice">
+                الطالب غير حافظ المراجعة: {rangeText(student.tomorrow.review)}.
+                تم إضافتها تلقائيًا إلى واجب الغد؛ يمكنك تعديلها.
+              </p>
+            )}
+            {student.reviewResult === "NOT_MASTERED" &&
+              student.tomorrow?.reviewManual && (
+                <p className="notice">
+                  الطالب غير حافظ المراجعة. أبقينا اختيارك اليدوي لواجب
+                  المراجعة؛ يمكنك تغييره هنا.
                 </p>
               )}
             {student.outcome === "ABSENT" &&

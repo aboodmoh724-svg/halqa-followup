@@ -429,6 +429,16 @@ try {
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
     assert.equal(await dialog.getByLabel("اسم الصورة (نص فقط)").count(), 0);
+    await dialog.getByText(/الطالب غير حافظ المراجعة:/).waitFor();
+    const reviewCarry = await (
+      await context.request.get(`${base}/api/halqas/${scheduleDay.halqaId}`)
+    ).json();
+    assert(reviewCarry.students[0].tomorrow.autoReviewStatusId);
+    assert.deepEqual(
+      reviewCarry.students[0].tomorrow.review,
+      reviewCarry.students[0].today.review,
+    );
+    await page.screenshot({ path: "work/smoke/review-auto-carry.png" });
     await dialog.getByLabel("واجب حفظ", { exact: true }).check();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
@@ -442,7 +452,10 @@ try {
         .count(),
       0,
     );
-    await dialog.getByLabel("واجب مراجعة", { exact: true }).check();
+    await dialog.getByText("تم تسجيل واجب المراجعة", { exact: true }).waitFor();
+    await dialog
+      .getByRole("button", { name: "تعديل واجب المراجعة", exact: true })
+      .click();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     await page
@@ -583,7 +596,7 @@ try {
     await page
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
-    await dialog.getByText(/أبقينا واجب الغد/).waitFor();
+    await dialog.getByText(/أبقينا اختيارك اليدوي لواجب الحفظ/).waitFor();
     await dialog
       .getByRole("button", { name: "تعديل واجب الحفظ", exact: true })
       .click();
@@ -673,6 +686,15 @@ try {
       true,
     );
     await page.screenshot({ path: "work/smoke/absence.png" });
+    const absentCarry = await (await context.request.get(url)).json();
+    assert.deepEqual(
+      absentCarry.students[1].tomorrow.memorization,
+      absentCarry.students[1].today.memorization,
+    );
+    assert.deepEqual(
+      absentCarry.students[1].tomorrow.review,
+      absentCarry.students[1].today.review,
+    );
     await page
       .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
       .click();

@@ -76,6 +76,8 @@ function assignmentView(
         imageName: string;
         autoMemorizationStatusId: string | null;
         memorizationManual: boolean;
+        autoReviewStatusId: string | null;
+        reviewManual: boolean;
       }
     | undefined,
   reviewOnly = false,
@@ -92,6 +94,8 @@ function assignmentView(
         imageName: a.imageName,
         autoMemorizationStatusId: a.autoMemorizationStatusId,
         memorizationManual: a.memorizationManual,
+        autoReviewStatusId: a.autoReviewStatusId,
+        reviewManual: a.reviewManual,
       }
     : null;
 }
@@ -333,22 +337,30 @@ export async function mutateDay(
           pageMappingVersion: pages.version,
         },
       });
-      const lastMemory = [...status.entries]
+      const lastOfKind = [...status.entries]
         .reverse()
-        .find((e) => e.kind === "MEMORIZATION");
+        .find((e) => e.kind === entry.kind);
       if (
-        entry.kind === "MEMORIZATION" &&
-        lastMemory?.id === entry.id &&
-        status.memorizationResult === "NOT_MASTERED"
+        lastOfKind?.id === entry.id &&
+        (entry.kind === "MEMORIZATION"
+          ? status.memorizationResult
+          : status.reviewResult) === "NOT_MASTERED"
       ) {
         await tx.assignment.updateMany({
           where: {
             enrollmentId: m.enrollmentId,
             dueDate: dayDate(nextDay(m.date)),
-            autoMemorizationStatusId: status.id,
-            memorizationManual: false,
+            ...(entry.kind === "MEMORIZATION"
+              ? {
+                  autoMemorizationStatusId: status.id,
+                  memorizationManual: false,
+                }
+              : { autoReviewStatusId: status.id, reviewManual: false }),
           },
-          data: { memorization: m.range },
+          data:
+            entry.kind === "MEMORIZATION"
+              ? { memorization: m.range }
+              : { review: m.range },
         });
       }
     }
@@ -432,11 +444,7 @@ export async function mutateDay(
         },
       });
     }
-    if (
-      (m.action === "assessment" || m.action === "entry") &&
-      m.kind === "MEMORIZATION" &&
-      m.assessment
-    ) {
+    if ((m.action === "assessment" || m.action === "entry") && m.assessment) {
       const where = {
         enrollmentId_dueDate: {
           enrollmentId: m.enrollmentId,
@@ -444,6 +452,12 @@ export async function mutateDay(
         },
       };
       const tomorrow = await tx.assignment.findUnique({ where });
+      const isMemory = m.kind === "MEMORIZATION";
+      const field = isMemory ? "memorization" : "review";
+      const manual = isMemory ? "memorizationManual" : "reviewManual";
+      const origin = isMemory
+        ? "autoMemorizationStatusId"
+        : "autoReviewStatusId";
       if (m.assessment === "NOT_MASTERED") {
         const today = await tx.assignment.findUnique({
           where: {
@@ -455,7 +469,7 @@ export async function mutateDay(
         });
         const last = [...status.entries]
           .reverse()
-          .find((e) => e.kind === "MEMORIZATION");
+          .find((e) => e.kind === m.kind);
         const candidate =
           m.action === "entry"
             ? m.range
@@ -469,13 +483,14 @@ export async function mutateDay(
                   endSurah: last.endSurah,
                   endAyah: last.endAyah,
                 }
-              : today?.memorization;
+              : today?.[field];
         const range = rangeSchema.safeParse(candidate);
         if (
           range.success &&
-          !tomorrow?.memorizationManual &&
+          !tomorrow?.[manual] &&
           (!tomorrow ||
-            tomorrow.autoMemorizationStatusId === status.id ||
+            !tomorrow[field] ||
+            tomorrow[origin] === status.id ||
             (today && tomorrow.carriedFromId === today.id))
         ) {
           await tx.assignment.upsert({
@@ -483,24 +498,34 @@ export async function mutateDay(
             create: {
               enrollmentId: m.enrollmentId,
               dueDate: dayDate(nextDay(m.date)),
-              memorization: range.data,
-              autoMemorizationStatusId: status.id,
+              ...(isMemory
+                ? {
+                    memorization: range.data,
+                    autoMemorizationStatusId: status.id,
+                  }
+                : { review: range.data, autoReviewStatusId: status.id }),
             },
             update: {
-              memorization: range.data,
-              autoMemorizationStatusId: status.id,
-              memorizationManual: false,
-              carriedFromId: null,
+              ...(isMemory
+                ? {
+                    memorization: range.data,
+                    autoMemorizationStatusId: status.id,
+                    memorizationManual: false,
+                  }
+                : {
+                    review: range.data,
+                    autoReviewStatusId: status.id,
+                    reviewManual: false,
+                  }),
             },
           });
         }
-      } else if (
-        tomorrow?.autoMemorizationStatusId === status.id &&
-        !tomorrow.memorizationManual
-      ) {
+      } else if (tomorrow?.[origin] === status.id && !tomorrow[manual]) {
         await tx.assignment.update({
           where,
-          data: { memorization: Prisma.DbNull, autoMemorizationStatusId: null },
+          data: isMemory
+            ? { memorization: Prisma.DbNull, autoMemorizationStatusId: null }
+            : { review: Prisma.DbNull, autoReviewStatusId: null },
         });
       }
     }
@@ -545,27 +570,43 @@ export async function mutateDay(
           (status.reviewOnly
             ? today.review
             : today.memorization || today.review)
-        )
-          await tx.assignment.upsert({
-            where: {
-              enrollmentId_dueDate: {
-                enrollmentId: m.enrollmentId,
-                dueDate: dayDate(nextDay(m.date)),
-              },
-            },
-            update: {},
-            create: {
+        ) {
+          const where = {
+            enrollmentId_dueDate: {
               enrollmentId: m.enrollmentId,
               dueDate: dayDate(nextDay(m.date)),
-              memorization: status.reviewOnly
-                ? Prisma.DbNull
-                : (today.memorization ?? Prisma.DbNull),
-              review: today.review ?? Prisma.DbNull,
-              note: today.note,
-              imageName: today.imageName,
-              carriedFromId: today.id,
             },
-          });
+          };
+          const tomorrow = await tx.assignment.findUnique({ where });
+          const memory =
+            !status.reviewOnly &&
+            !tomorrow?.memorization &&
+            !tomorrow?.memorizationManual
+              ? today.memorization
+              : null;
+          const review =
+            !tomorrow?.review && !tomorrow?.reviewManual ? today.review : null;
+          if (memory || review)
+            await tx.assignment.upsert({
+              where,
+              update: {
+                ...(memory
+                  ? { memorization: memory, autoMemorizationStatusId: null }
+                  : {}),
+                ...(review ? { review, autoReviewStatusId: null } : {}),
+                carriedFromId: tomorrow?.carriedFromId ?? today.id,
+              },
+              create: {
+                enrollmentId: m.enrollmentId,
+                dueDate: dayDate(nextDay(m.date)),
+                memorization: memory ?? Prisma.DbNull,
+                review: review ?? Prisma.DbNull,
+                note: today.note,
+                imageName: today.imageName,
+                carriedFromId: today.id,
+              },
+            });
+        }
       }
     }
     if (m.action === "assignment") {
@@ -595,11 +636,15 @@ export async function mutateDay(
             }
           : {}),
         ...(m.review !== undefined
-          ? { review: m.review ?? Prisma.DbNull }
+          ? {
+              review: m.review ?? Prisma.DbNull,
+              autoReviewStatusId: null,
+              reviewManual: true,
+            }
           : {}),
         ...(m.note !== undefined ? { note: m.note.trim() } : {}),
         ...(m.imageName !== undefined ? { imageName: m.imageName.trim() } : {}),
-        carriedFromId: null,
+        carriedFromId: previous?.carriedFromId ?? null,
       };
       await tx.assignment.upsert({
         where: {

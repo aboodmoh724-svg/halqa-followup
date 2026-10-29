@@ -247,13 +247,15 @@ test(
       assert.equal(saved.memorizationResult, null);
       assert.equal(saved.outcome, "MEMORIZED");
       assert.equal(saved.suggestions?.memorization, null);
-      assert.deepEqual(reportIssues(saved), []);
+      assert.deepEqual(reportIssues(saved), ["واجب الغد"]);
+      assert.equal(saved.tomorrow?.review, null);
       await post({
         action: "assignment",
         review: range,
         note: "مراجعة الغد",
         imageName: "",
       });
+      assert.deepEqual(reportIssues(await read()), []);
       await ensureDay(teacher.id, halqa.id, nextDay(date));
       const tomorrow = await read(nextDay(date));
       assert.equal(tomorrow.reviewOnly, true);
