@@ -1,3 +1,4 @@
+import { englishDigits } from "./report-format";
 import { academyLogoPath } from "./branding";
 import { collectiveReportMarkup } from "./collective-report";
 import { readFile } from "node:fs/promises";
@@ -72,7 +73,7 @@ export async function generateHtmlPdf(
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     await page.route("**/*", (route) => route.abort());
-    await page.setContent(html, {
+    await page.setContent(englishDigits(html), {
       waitUntil: "load",
       timeout: 15000,
     });

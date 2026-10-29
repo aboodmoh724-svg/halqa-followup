@@ -48,6 +48,12 @@ const t = await db.teacher.create({
 const transferTarget = await db.halqa.create({
   data: { name: "حلقة الاستقبال التجريبية", teacherId: t.id },
 });
+const pdfPages = (buffer) =>
+  [
+    ...buffer
+      .toString("latin1")
+      .matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g),
+  ].map((m) => ({ width: Number(m[1]), height: Number(m[2]) }));
 const page = await context.newPage(),
   errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -273,6 +279,9 @@ try {
   const buffer = await pdf.body();
   assert.equal(buffer.subarray(0, 4).toString(), "%PDF");
   assert.match(buffer.toString("latin1"), /\/Subtype\s*\/Image/);
+  assert(pdfPages(buffer).length > 0);
+  assert(pdfPages(buffer).every((p) => p.height > p.width));
+
   await writeFile("work/smoke/supervision-report.pdf", buffer);
   await page.screenshot({
     path: "work/smoke/supervisor-reports.png",
@@ -308,6 +317,23 @@ try {
   await report
     .getByRole("link", { name: "تنزيل التقرير PDF", exact: true })
     .waitFor();
+  assert.equal(
+    await report.getByLabel("٣. الحلقة", { exact: true }).count(),
+    0,
+  );
+  const unifiedDownload = report.getByRole("link", {
+    name: "تنزيل التقرير PDF",
+    exact: true,
+  });
+  const unifiedResponse = await context.request.get(
+    new URL(await unifiedDownload.getAttribute("href"), base).href,
+    { timeout: 90000 },
+  );
+  assert.equal(unifiedResponse.status(), 200);
+  const unifiedBuffer = await unifiedResponse.body();
+  assert(pdfPages(unifiedBuffer).length >= 3);
+  assert(pdfPages(unifiedBuffer).every((p) => p.width > p.height));
+  await writeFile("work/smoke/unified-weekly-report.pdf", unifiedBuffer);
   assert.equal(
     (
       await context.request.get(
@@ -447,9 +473,7 @@ try {
     name: "نقل الطالب",
     exact: true,
   });
-  await transfer
-    .getByLabel("الحلقة الجديدة")
-    .selectOption(transferTarget.id);
+  await transfer.getByLabel("الحلقة الجديدة").selectOption(transferTarget.id);
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     assert(
