@@ -259,6 +259,89 @@ try {
     401,
   );
   assert.equal(await db.dailySession.count({ where: { halqaId: h.id } }), 3);
+  // Create an incomplete expired school day and a non-blocking Quran gap.
+  const yesterday = new Date(date + "T00:00:00Z");
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  await db.dailyStudentStatus.updateMany({
+    where: {
+      enrollmentId: e.id,
+      session: { date: { in: [yesterday, new Date(date + "T00:00:00Z")] } },
+    },
+    data: {
+      outcome: "NOT_MEMORIZED",
+      memorizationResult: "MASTERED",
+      reviewResult: "NOT_MASTERED",
+    },
+  });
+  const currentStatus = await db.dailyStudentStatus.findFirstOrThrow({
+    where: {
+      enrollmentId: e.id,
+      session: { date: new Date(date + "T00:00:00Z") },
+    },
+  });
+  for (const [startAyah, endAyah] of [
+    [1, 20],
+    [23, 25],
+  ])
+    await db.recitationEntry.create({
+      data: {
+        dailyStatusId: currentStatus.id,
+        kind: "MEMORIZATION",
+        assessment: "MASTERED",
+        startSurah: 2,
+        endSurah: 2,
+        startAyah,
+        endAyah,
+        requestKey: randomUUID(),
+      },
+    });
+  await page.reload();
+  await page
+    .getByRole("heading", { name: "الحلقات اليوم", exact: true })
+    .waitFor();
+  await page
+    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("button", { name: /التنبيهات/ })
+    .click();
+  await page
+    .getByRole("button", { name: new RegExp(s.name) })
+    .filter({ hasText: /تسجيل يحتاج مراجعة: البقرة 1.*يوجد 2 آية/ })
+    .waitFor();
+  const card = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("button", { name: new RegExp(h.name) }) });
+  await card.getByText(/التسجيل غير مكتمل/).waitFor();
+  await card.getByText("عرض الطلاب وما ينقصهم", { exact: true }).click();
+  await page.screenshot({
+    path: "work/smoke/supervisor-recording-alerts.png",
+    fullPage: true,
+  });
+  assert(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  await db.recitationEntry.create({
+    data: {
+      dailyStatusId: currentStatus.id,
+      kind: "MEMORIZATION",
+      assessment: "MASTERED",
+      startSurah: 2,
+      endSurah: 2,
+      startAyah: 21,
+      endAyah: 22,
+      requestKey: randomUUID(),
+    },
+  });
+  const filled = await (
+    await context.request.get(base + "/api/supervisor/overview")
+  ).json();
+  assert.equal(
+    filled.alerts.filter(
+      (a) => a.enrollmentId === e.id && a.kind === "sequence",
+    ).length,
+    0,
+  );
   // Switching identities revokes the opposite session instead of mixing permissions.
   assert.equal(
     (
@@ -311,6 +394,9 @@ try {
   throw error;
 } finally {
   await browser.close();
+  await db.recitationEntry.deleteMany({
+    where: { dailyStatus: { halqaId: h.id } },
+  });
   await db.dailyStudentStatus.deleteMany({ where: { halqaId: h.id } });
   await db.dailySession.deleteMany({ where: { halqaId: h.id } });
   await db.enrollment.delete({ where: { id: e.id } });

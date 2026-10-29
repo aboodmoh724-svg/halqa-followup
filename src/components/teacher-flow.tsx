@@ -12,7 +12,7 @@ import {
 import AcademyLogo from "./academy-logo";
 import Sheet, { type Mode } from "./recitation-sheet";
 import StudentHistory from "./student-history";
-import { dailyWindow } from "@/lib/dates";
+import { dailyWindow, assignmentDateLabel } from "@/lib/dates";
 import { academyName } from "@/lib/branding";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
@@ -668,6 +668,9 @@ export default function TeacherFlow() {
               {student.tomorrow && (
                 <section className="card small-space">
                   <h3>واجب الغد</h3>
+                  <p className="subtle">
+                    موعد الواجب: {assignmentDateLabel(day.date)}
+                  </p>
                   {!student.reviewOnly && (
                     <p>
                       الحفظ: {rangeDescription(student.tomorrow.memorization)}
@@ -961,8 +964,9 @@ export default function TeacherFlow() {
           <details className="card teacher-guide small-space">
             <summary>دليل المعلم · طريقة المتابعة اليومية</summary>
             <p className="subtle">
-              كل يوم من 6 صباحًا حتى منتصف الليل. يبدأ تقرير جديد دون حذف
-              التقارير السابقة، ويظهر واجب الغد في واجب اليوم.
+              من الاثنين إلى الجمعة، من 6 صباحًا حتى منتصف الليل. يبدأ تقرير
+              جديد دون حذف التقارير السابقة، ويظهر الواجب في يوم الدراسة التالي.
+              السبت والأحد عطلة.
             </p>
             <ol>
               <li>

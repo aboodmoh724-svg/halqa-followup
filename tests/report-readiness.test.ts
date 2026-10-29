@@ -48,6 +48,22 @@ test("first-day absence needs neither homework nor recitation nor assessment", (
   assert.deepEqual(reportIssues(absent), []);
   assert.deepEqual(reportIssues({ ...absent, tomorrow: null }), []);
 });
+test("Friday parent reports label Monday as the homework date", () => {
+  const day: DayView = {
+    halqaId: "h",
+    halqaName: "حلقة",
+    teacherName: "معلم",
+    date: "2026-10-30",
+    timezone: "Europe/Istanbul",
+    closedAt: null,
+    students: [student],
+  };
+  assert.match(reportMarkup(day, [student], ""), /موعد الواجب: الاثنين/);
+  assert.match(
+    reportMarkup(day, [student], "", true),
+    /واجب الغد<br><small>الاثنين/,
+  );
+});
 
 test("غير حافظ requires a recorded range for both activities; legacy closed reports remain readable", () => {
   const noRecitation: StudentView = {

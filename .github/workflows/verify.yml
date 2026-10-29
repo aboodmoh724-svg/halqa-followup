@@ -27,6 +27,7 @@ jobs:
       APP_TIMEZONE: Europe/Istanbul
       SEED_TEACHER_CODE: "729416" # Disposable CI database only.
       ALLOW_SMOKE_MUTATIONS: "true"
+      HALQA_TEST_CLOCK: "2026-10-29T09:00:00Z"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,7 +45,7 @@ jobs:
       - name: Start production server for mobile smoke test
         run: |
           mkdir -p work/smoke
-          npm run start > work/server.log 2>&1 &
+          npm run start:test > work/server.log 2>&1 &
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://localhost:3000/ > /dev/null; then exit 0; fi
             sleep 1

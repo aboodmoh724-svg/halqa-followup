@@ -1,10 +1,17 @@
 import { db } from "./db";
-import { dayDate, dayKey } from "./dates";
+import {
+  dayDate,
+  dayKey,
+  isStudyDay,
+  nextAssignmentDay,
+  lastFinishedStudyDay,
+} from "./dates";
+import { latestMemoryGap } from "./supervision-gaps";
 import { reportIssues, type StudentView } from "./types";
 import { totalPages, rangeSchema, type QuranRange } from "./quran";
 export type SupervisorAlert = {
   id: string;
-  kind: "absence" | "memory" | "review" | "incomplete";
+  kind: "absence" | "memory" | "review" | "incomplete" | "sequence";
   halqaId: string;
   enrollmentId: string;
   studentName: string;
@@ -20,7 +27,9 @@ type StreakDay = {
   reviewOnly: boolean;
 };
 export function studentStreaks(days: StreakDay[]) {
-  const sorted = [...days].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = days
+    .filter((d) => isStudyDay(d.date))
+    .sort((a, b) => b.date.localeCompare(a.date));
   const count = (matches: (d: StreakDay) => boolean) => {
     const dates: string[] = [];
     for (const day of sorted) {
@@ -42,7 +51,8 @@ export function studentStreaks(days: StreakDay[]) {
     ),
   };
 }
-export async function getSupervisorOverview(date = dayKey()) {
+export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
+  const deadlineDate = lastFinishedStudyDay(now);
   const since = dayDate(date);
   since.setUTCDate(since.getUTCDate() - 29);
   const weekly = dayDate(date);
@@ -100,6 +110,31 @@ export async function getSupervisorOverview(date = dayKey()) {
             : [];
         });
         const streaks = studentStreaks(recorded);
+        const gap = !e.reviewOnly
+          ? latestMemoryGap(
+              [...recorded]
+                .reverse()
+                .flatMap((d) =>
+                  d.entries
+                    .filter(
+                      (x) =>
+                        x.kind === "MEMORIZATION" && d.outcome !== "ABSENT",
+                    )
+                    .map((x) => ({ id: x.id, date: d.date, range: x })),
+                ),
+            )
+          : null;
+        if (gap)
+          alerts.push({
+            id: `${e.id}:sequence:${gap.entryId}`,
+            kind: "sequence",
+            halqaId: h.id,
+            enrollmentId: e.id,
+            studentName: e.student.name,
+            halqaName: h.name,
+            message: gap.message,
+            dates: gap.dates,
+          });
         for (const kind of ["absence", "memory", "review"] as const) {
           const dates = streaks[kind];
           if (dates.length < 3) continue;
@@ -178,7 +213,7 @@ export async function getSupervisorOverview(date = dayKey()) {
   const assignments = await db.assignment.findMany({
     where: {
       enrollmentId: { in: classes.flatMap((h) => h.students.map((s) => s.id)) },
-      dueDate: new Date(dayDate(date).getTime() + 86400000),
+      dueDate: dayDate(nextAssignmentDay(date)),
     },
   });
   const mapped = classes.map((h) => {
@@ -219,10 +254,99 @@ export async function getSupervisorOverview(date = dayKey()) {
             : "not-started",
     };
   });
+  // Deadline checks read only completed school days, including Friday on a
+  // weekend. Avoid retroactive alerts before the school first used the system.
+  const first = await db.dailySession.aggregate({
+    where: { halqaId: { in: classes.map((h) => h.id) } },
+    _min: { date: true },
+  });
+  const followupDate =
+    deadlineDate < date ? deadlineDate : isStudyDay(date) ? date : deadlineDate;
+  const dueAssignments =
+    first._min.date && first._min.date <= dayDate(followupDate)
+      ? await db.assignment.findMany({
+          where: {
+            enrollmentId: {
+              in: classes.flatMap((h) => h.students.map((s) => s.id)),
+            },
+            dueDate: dayDate(nextAssignmentDay(followupDate)),
+          },
+        })
+      : [];
+  const recordingAlerts =
+    first._min.date &&
+    first._min.date <= dayDate(followupDate) &&
+    followupDate <= deadlineDate
+      ? halqas.flatMap((h) => {
+          if (!h.enrollments.length) return [];
+          const session = h.days.find(
+            (d) => d.date.toISOString().slice(0, 10) === followupDate,
+          );
+          let recorded = 0;
+          const missing = h.enrollments.flatMap((e) => {
+            const status = session?.statuses.find(
+              (s) => s.enrollmentId === e.id,
+            );
+            if (
+              status &&
+              (status.outcome ||
+                status.memorizationResult ||
+                status.reviewResult ||
+                status.entries.length ||
+                status.note)
+            )
+              recorded++;
+            const a = dueAssignments.find((a) => a.enrollmentId === e.id);
+            const parse = (v: unknown) => {
+              const p = rangeSchema.safeParse(v);
+              return p.success ? p.data : null;
+            };
+            const issues = reportIssues({
+              enrollmentId: e.id,
+              name: e.student.name,
+              reviewOnly: status?.reviewOnly ?? e.reviewOnly,
+              outcome: status?.outcome ?? null,
+              memorizationResult: status?.memorizationResult,
+              reviewResult: status?.reviewResult,
+              note: status?.note ?? "",
+              today: null,
+              entries: status?.entries ?? [],
+              tomorrow: a
+                ? {
+                    id: a.id,
+                    memorization: parse(a.memorization),
+                    review: parse(a.review),
+                    note: a.note,
+                    imageName: a.imageName,
+                  }
+                : null,
+            } as unknown as StudentView);
+            return issues.length
+              ? [{ enrollmentId: e.id, name: e.student.name, issues }]
+              : [];
+          });
+          return missing.length
+            ? [
+                {
+                  id: `${h.id}:${followupDate}`,
+                  halqaId: h.id,
+                  halqaName: h.name,
+                  teacherName: h.teacher.name,
+                  date: followupDate,
+                  kind: recorded ? "incomplete" : "not-started",
+                  missing,
+                  total: h.enrollments.length,
+                },
+              ]
+            : [];
+        })
+      : [];
   return {
     date,
     classes: mapped,
     alerts,
+    recordingAlerts,
+    deadlineDate: followupDate,
     totalStudents: mapped.reduce((n, h) => n + h.students.length, 0),
   };
 }

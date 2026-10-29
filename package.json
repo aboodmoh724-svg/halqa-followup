@@ -6,13 +6,14 @@
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
+    "start:test": "node --import ./tests/school-clock.mjs node_modules/next/dist/bin/next start",
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "node --import ./tests/school-clock.mjs node_modules/tsx/dist/cli.mjs --test tests/*.test.ts",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "format": "prettier --write src tests",
-    "test:browser": "node --env-file-if-exists=.env tests/browser-smoke.mjs && node --env-file-if-exists=.env tests/supervisor-smoke.mjs"
+    "test:browser": "node --env-file-if-exists=.env --import ./tests/school-clock.mjs tests/browser-smoke.mjs && node --env-file-if-exists=.env --import ./tests/school-clock.mjs tests/supervisor-smoke.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
