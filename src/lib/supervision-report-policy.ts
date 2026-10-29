@@ -89,8 +89,12 @@ export function reportPeriod(preset: string, today: string) {
   if (preset === "week" || preset === "previous-week") {
     start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
     if (preset === "previous-week") {
-      end.setTime(start.getTime() - 86400000);
+      end.setTime(start.getTime() - 3 * 86400000);
       start.setUTCDate(start.getUTCDate() - 7);
+    } else {
+      const friday = new Date(start);
+      friday.setUTCDate(friday.getUTCDate() + 4);
+      if (end > friday) end.setTime(friday.getTime());
     }
   } else if (preset === "month") start.setUTCDate(1);
   else if (preset === "previous-month") {

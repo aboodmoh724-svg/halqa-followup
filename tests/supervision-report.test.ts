@@ -23,7 +23,7 @@ test("report periods respect calendar boundaries and query limits", () => {
   });
   assert.deepEqual(reportPeriod("previous-week", "2026-01-01"), {
     from: "2025-12-22",
-    to: "2025-12-28",
+    to: "2025-12-26",
   });
   for (const q of [
     { from: "2026-02-30", to: "2026-03-01" },
@@ -164,15 +164,17 @@ test(
         where: { halqaId: h.id },
       });
       const all = await getSupervisionReport(raw);
-      assert.equal(all.rows.length, 4);
-      assert.equal(all.rows[0].masteryRate, 0);
-      assert.equal(all.rows[0].active, false);
+      const fixtureRows = all.rows.filter((r) => r.halqaId === h.id);
+      assert.equal(fixtureRows.length, 4);
+      const scopedAll = { ...all, rows: fixtureRows };
+      assert.equal(fixtureRows[0].masteryRate, 0);
+      assert.equal(fixtureRows[0].active, false);
       assert(
-        Math.abs(all.rows[0].memoryPages - 2 * pageAmount(range)!.amount) <
+        Math.abs(fixtureRows[0].memoryPages - 2 * pageAmount(range)!.amount) <
           0.001,
       );
-      assert.equal(all.rows[0].memoryMasteredDays, 3);
-      assert.equal(all.rows[0].reviewMasteredDays, 0);
+      assert.equal(fixtureRows[0].memoryMasteredDays, 3);
+      assert.equal(fixtureRows[0].reviewMasteredDays, 0);
       const support = await getSupervisionReport({ ...raw, type: "support" });
       assert.deepEqual(
         support.rows.map((x) => x.enrollmentId).sort(),
@@ -217,10 +219,15 @@ test(
         /الطالب غير موجود/,
       );
       await assert.rejects(
-        () => getSupervisionReport({ ...raw, halqaId: "not-a-class" }),
+        () =>
+          getSupervisionReport({
+            ...raw,
+            type: "support",
+            halqaId: "not-a-class",
+          }),
         /الحلقة غير موجودة/,
       );
-      const html = supervisionReportMarkup(all, "");
+      const html = supervisionReportMarkup(scopedAll, "");
       assert(!html.includes('<script>alert("test")</script>'));
       assert(html.includes("&lt;script&gt;"));
       assert(html.includes("لا تقيس نسبة حفظ المصحف"));

@@ -17,6 +17,17 @@ export async function enrollmentIdsOnDate(
     select: { studentId: true, sourceEnrollmentId: true, createdAt: true },
     orderBy: { sequence: "desc" },
   });
+  return enrollmentIdsAtDate(active, transfers, date);
+}
+export function enrollmentIdsAtDate(
+  active: { id: string; studentId: string }[],
+  transfers: {
+    studentId: string;
+    sourceEnrollmentId: string;
+    createdAt: Date;
+  }[],
+  date: string,
+) {
   const ids = new Set(active.map((e) => e.id));
   const membership = new Map(active.map((e) => [e.studentId, e.id]));
   for (const t of transfers) {

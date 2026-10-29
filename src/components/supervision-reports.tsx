@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { ClipboardList, Download, SlidersHorizontal } from "lucide-react";
 import type { SupervisionReport } from "@/lib/supervision-report";
 import { reportTitles, reportPeriod } from "@/lib/supervision-report-policy";
-import { formatPages } from "@/lib/quran";
+import { reportNumber as formatPages } from "@/lib/report-format";
 type ClassOption = {
   id: string;
   name: string;
@@ -19,8 +19,8 @@ export default function SupervisionReports({
   onStudent: (h: string, s: string) => void;
 }) {
   const [type, setType] = useState<keyof typeof reportTitles>("comprehensive"),
-    [preset, setPreset] = useState("week"),
-    [dates, setDates] = useState(() => reportPeriod("week", today)),
+    [preset, setPreset] = useState("previous-week"),
+    [dates, setDates] = useState(() => reportPeriod("previous-week", today)),
     [halqaId, setHalqaId] = useState(""),
     [enrollmentId, setEnrollmentId] = useState("");
   const [minDays, setMinDays] = useState("3"),
@@ -43,7 +43,7 @@ export default function SupervisionReports({
     absenceMin,
     maxAbsences,
   });
-  if (halqaId) params.set("halqaId", halqaId);
+  if (halqaId && type !== "comprehensive") params.set("halqaId", halqaId);
   if (type === "student" && enrollmentId)
     params.set("enrollmentId", enrollmentId);
   const query = params.toString(),
@@ -106,8 +106,10 @@ export default function SupervisionReports({
                 setDates(reportPeriod(e.target.value, today));
             }}
           >
-            <option value="week">هذا الأسبوع (من الاثنين)</option>
-            <option value="previous-week">الأسبوع السابق</option>
+            <option value="week">هذا الأسبوع حتى اليوم</option>
+            <option value="previous-week">
+              الأسبوع السابق (الاثنين إلى الجمعة)
+            </option>
             <option value="month">هذا الشهر</option>
             <option value="previous-month">الشهر السابق</option>
             <option value="custom">فترة مخصصة</option>
@@ -145,27 +147,36 @@ export default function SupervisionReports({
             />
           </label>
         </div>
-        <label>
-          ٣. الحلقة
-          <select
-            aria-label="٣. الحلقة"
-            value={halqaId}
-            required={type === "student"}
-            onChange={(e) => {
-              setHalqaId(e.target.value);
-              setEnrollmentId("");
-            }}
-          >
-            <option value="">
-              {type === "student" ? "اختر الحلقة" : "جميع الحلقات"}
-            </option>
-            {classes.map((h) => (
-              <option value={h.id} key={h.id}>
-                {h.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {type === "comprehensive" ? (
+          <p className="notice">
+            ملف PDF واحد: ملخص الفترة ثم جميع الحلقات وطلابها. الأرقام إنجليزية،
+            والتقرير الموحد عرضي.
+          </p>
+        ) : (
+          <>
+            <label>
+              ٣. الحلقة
+              <select
+                aria-label="٣. الحلقة"
+                value={halqaId}
+                required={type === "student"}
+                onChange={(e) => {
+                  setHalqaId(e.target.value);
+                  setEnrollmentId("");
+                }}
+              >
+                <option value="">
+                  {type === "student" ? "اختر الحلقة" : "جميع الحلقات"}
+                </option>
+                {classes.map((h) => (
+                  <option value={h.id} key={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
         {type === "student" && (
           <label>
             الطالب
