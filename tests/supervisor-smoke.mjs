@@ -448,7 +448,7 @@ try {
     exact: true,
   });
   await transfer
-    .getByLabel("الحلقة الجديدة", { exact: true })
+    .getByLabel("الحلقة الجديدة")
     .selectOption(transferTarget.id);
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
