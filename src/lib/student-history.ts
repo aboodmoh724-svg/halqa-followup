@@ -26,6 +26,9 @@ export const historyQuery = z
 export type HistoryQuery = z.infer<typeof historyQuery>;
 export type HistoryDay = {
   date: string;
+  halqaId?: string;
+  enrollmentId?: string;
+  halqaName?: string;
   outcome: Outcome | null;
   reviewOnly: boolean;
   memorizationResult: string | null;
@@ -70,6 +73,11 @@ export async function getStudentHistory(
     include: { student: true, halqa: true },
   });
   if (!enrollment) throw new HttpError(404, "الطالب غير موجود في حلقاتك");
+  // The current teacher can read the student's earlier classes; former teachers
+  // retain only records belonging to their own enrollment.
+  const scope = enrollment.active
+    ? { enrollment: { studentId: enrollment.studentId } }
+    : { enrollmentId, halqaId };
   const through = query.to && query.to < dayKey() ? query.to : dayKey();
   const bounds = {
     ...(query.from ? { gte: dayDate(query.from) } : {}),
@@ -78,8 +86,7 @@ export async function getStudentHistory(
   // Reading a history never opens a day, invents an absence, or creates a report.
   const records = await db.dailyStudentStatus.findMany({
     where: {
-      enrollmentId,
-      halqaId,
+      ...scope,
       session: { date: bounds },
       OR: [
         { outcome: { not: null } },
@@ -90,7 +97,14 @@ export async function getStudentHistory(
       ],
     },
     include: {
-      session: { select: { date: true, closedAt: true } },
+      session: {
+        select: {
+          date: true,
+          closedAt: true,
+          halqa: { select: { name: true } },
+        },
+      },
+      enrollment: { select: { studentId: true } },
       entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
     },
     orderBy: { session: { date: "desc" } },
@@ -127,9 +141,14 @@ export async function getStudentHistory(
   const visible = page.slice(0, 20);
   const assignments = await db.assignment.findMany({
     where: {
-      enrollmentId,
+      enrollment: { studentId: enrollment.studentId },
       dueDate: { in: visible.map((r) => r.session.date) },
     },
+    orderBy: [
+      { enrollment: { active: "desc" } },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ],
   });
   const assignmentView = (
     a: (typeof assignments)[number],
@@ -151,8 +170,7 @@ export async function getStudentHistory(
       where: {
         ...(kind ? { kind } : {}),
         dailyStatus: {
-          enrollmentId,
-          halqaId,
+          ...scope,
           session: { date: { lte: dayDate(dayKey()) } },
         },
       },
@@ -208,6 +226,9 @@ export async function getStudentHistory(
       );
       return {
         date: r.session.date.toISOString().slice(0, 10),
+        halqaId: r.halqaId,
+        enrollmentId: r.enrollmentId,
+        halqaName: r.session.halqa.name,
         outcome: r.outcome,
         reviewOnly: r.reviewOnly,
         memorizationResult: r.memorizationResult,

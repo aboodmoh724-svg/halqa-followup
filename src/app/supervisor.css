@@ -452,3 +452,21 @@
   width: 100%;
   margin-top: 16px;
 }
+.supervisor-transfer {
+  margin: 0 0 20px;
+  padding: 18px;
+  border-radius: 18px;
+}
+.supervisor-transfer label {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.supervisor-transfer select {
+  width: 100%;
+  min-width: 0;
+}
+.supervisor-transfer .primary {
+  width: 100%;
+  margin-top: 16px;
+}

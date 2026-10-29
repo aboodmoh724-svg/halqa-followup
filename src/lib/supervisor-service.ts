@@ -6,6 +6,7 @@ import {
   nextAssignmentDay,
   lastFinishedStudyDay,
 } from "./dates";
+import { enrollmentIdsOnDate } from "./enrollment-history";
 import { latestMemoryGap } from "./supervision-gaps";
 import { reportIssues, type StudentView } from "./types";
 import { totalPages, rangeSchema, type QuranRange } from "./quran";
@@ -68,10 +69,11 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
       name: true,
       teacher: { select: { name: true } },
       enrollments: {
-        where: { active: true },
         orderBy: { position: "asc" },
         select: {
           id: true,
+          studentId: true,
+          active: true,
           reviewOnly: true,
           student: { select: { name: true } },
         },
@@ -90,8 +92,26 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
     },
     orderBy: { name: "asc" },
   });
+  // Follow the pupil across classes for streaks and sequence advice, while class
+  // totals keep each original day's class rather than relabelling history.
+  const pupilHistory = await db.dailyStudentStatus.findMany({
+    where: {
+      enrollment: {
+        studentId: {
+          in: halqas.flatMap((h) => h.enrollments.map((e) => e.studentId)),
+        },
+      },
+      session: { date: { gte: since, lte: dayDate(date) } },
+    },
+    include: {
+      enrollment: { select: { studentId: true } },
+      session: { select: { date: true } },
+      entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+    },
+  });
   const alerts: SupervisorAlert[] = [];
   const classes = halqas
+    .map((h) => ({ ...h, enrollments: h.enrollments.filter((e) => e.active) }))
     .filter((h) => h.enrollments.length > 0)
     .map((h) => {
       const today = h.days.find(
@@ -99,16 +119,20 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
       );
       const students = h.enrollments.map((e) => {
         const current = today?.statuses.find((s) => s.enrollmentId === e.id);
-        const recorded = h.days.flatMap((d) => {
-          const s = d.statuses.find((s) => s.enrollmentId === e.id);
-          return s &&
-            (s.outcome ||
-              s.memorizationResult ||
-              s.reviewResult ||
-              s.entries.length)
-            ? [{ ...s, date: d.date.toISOString().slice(0, 10) }]
-            : [];
-        });
+        const recorded = pupilHistory
+          .filter(
+            (s) =>
+              s.enrollment.studentId === e.studentId &&
+              (s.outcome ||
+                s.memorizationResult ||
+                s.reviewResult ||
+                s.entries.length),
+          )
+          .map((s) => ({
+            ...s,
+            date: s.session.date.toISOString().slice(0, 10),
+          }))
+          .sort((a, b) => b.date.localeCompare(a.date));
         const streaks = studentStreaks(recorded);
         const gap = !e.reviewOnly
           ? latestMemoryGap(
@@ -257,27 +281,46 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
   // Deadline checks read only completed school days, including Friday on a
   // weekend. Avoid retroactive alerts before the school first used the system.
   const first = await db.dailySession.aggregate({
-    where: { halqaId: { in: classes.map((h) => h.id) } },
+    where: { halqaId: { in: halqas.map((h) => h.id) } },
     _min: { date: true },
   });
   const followupDate =
     deadlineDate < date ? deadlineDate : isStudyDay(date) ? date : deadlineDate;
+  const followupRoster = await enrollmentIdsOnDate(db, followupDate);
   const dueAssignments =
     first._min.date && first._min.date <= dayDate(followupDate)
       ? await db.assignment.findMany({
           where: {
-            enrollmentId: {
-              in: classes.flatMap((h) => h.students.map((s) => s.id)),
+            enrollment: {
+              studentId: {
+                in: halqas.flatMap((h) =>
+                  h.enrollments
+                    .filter((e) => followupRoster.has(e.id))
+                    .map((e) => e.studentId),
+                ),
+              },
             },
             dueDate: dayDate(nextAssignmentDay(followupDate)),
           },
+          include: { enrollment: { select: { studentId: true } } },
+          orderBy: [
+            { enrollment: { active: "desc" } },
+            { updatedAt: "desc" },
+            { id: "asc" },
+          ],
         })
       : [];
   const recordingAlerts =
     first._min.date &&
     first._min.date <= dayDate(followupDate) &&
     followupDate <= deadlineDate
-      ? halqas.flatMap((h) => {
+      ? halqas.flatMap((original) => {
+          const h = {
+            ...original,
+            enrollments: original.enrollments.filter((e) =>
+              followupRoster.has(e.id),
+            ),
+          };
           if (!h.enrollments.length) return [];
           const session = h.days.find(
             (d) => d.date.toISOString().slice(0, 10) === followupDate,
@@ -296,7 +339,9 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
                 status.note)
             )
               recorded++;
-            const a = dueAssignments.find((a) => a.enrollmentId === e.id);
+            const a = dueAssignments.find(
+              (a) => a.enrollment.studentId === e.studentId,
+            );
             const parse = (v: unknown) => {
               const p = rangeSchema.safeParse(v);
               return p.success ? p.data : null;

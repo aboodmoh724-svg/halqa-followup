@@ -5,7 +5,7 @@ import {
   suggestMemorySequence,
   type MemorySequenceView,
 } from "./memorization-order";
-type Client = Pick<Prisma.TransactionClient, "recitationEntry">;
+type Client = Pick<Prisma.TransactionClient, "recitationEntry" | "enrollment">;
 // Read actual history, including teacher-accepted gaps. Old strict anchors are
 // preserved in the DB but no longer constrain reads or writes.
 export async function readMemorySequences(
@@ -15,11 +15,15 @@ export async function readMemorySequences(
 ) {
   const views = new Map<string, MemorySequenceView>();
   if (!enrollmentIds.length) return views;
+  const enrollments = await client.enrollment.findMany({
+    where: { id: { in: enrollmentIds } },
+    select: { id: true, studentId: true },
+  });
   const rows = await client.recitationEntry.findMany({
     where: {
       kind: "MEMORIZATION",
       dailyStatus: {
-        enrollmentId: { in: enrollmentIds },
+        enrollment: { studentId: { in: enrollments.map((e) => e.studentId) } },
         session: { date: { lte: dayDate(date) } },
         OR: [{ outcome: null }, { outcome: { not: "ABSENT" } }],
       },
@@ -28,6 +32,7 @@ export async function readMemorySequences(
       dailyStatus: {
         select: {
           enrollmentId: true,
+          enrollment: { select: { studentId: true } },
           memorizationResult: true,
           session: { select: { date: true } },
         },
@@ -41,9 +46,13 @@ export async function readMemorySequences(
   });
   const grouped = new Map<string, typeof rows>();
   for (const row of rows) {
-    const group = grouped.get(row.dailyStatus.enrollmentId) ?? [];
-    group.push(row);
-    grouped.set(row.dailyStatus.enrollmentId, group);
+    for (const enrollment of enrollments.filter(
+      (e) => e.studentId === row.dailyStatus.enrollment.studentId,
+    )) {
+      const group = grouped.get(enrollment.id) ?? [];
+      group.push(row);
+      grouped.set(enrollment.id, group);
+    }
   }
   for (const [id, records] of grouped) {
     const latestByDay = new Map<string, string>();

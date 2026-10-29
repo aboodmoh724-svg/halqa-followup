@@ -16,6 +16,7 @@ import {
 } from "./types";
 import { rangeSchema, pageAmount } from "./quran";
 import { readMemorySequences } from "./memorization-sequence";
+import { enrollmentIdsOnDate } from "./enrollment-history";
 import { suggestAssignment } from "./assignment-suggestions";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -42,9 +43,10 @@ export async function ensureDay(
   date = dayKey(),
 ) {
   return serial(async (tx) => {
+    const roster = await enrollmentIdsOnDate(tx, date, halqaId);
     const halqa = await tx.halqa.findFirst({
       where: { id: halqaId, teacherId },
-      include: { enrollments: { where: { active: true } } },
+      include: { enrollments: { where: { id: { in: [...roster] } } } },
     });
     if (!halqa) throw new HttpError(404, "الحلقة غير موجودة");
     const session = await tx.dailySession.upsert({
@@ -127,6 +129,22 @@ export async function getDay(
     },
   });
   if (!session) throw new HttpError(404, "لم يبدأ يوم الحلقة");
+  // Homework follows the pupil; old reports still resolve the same assignment
+  // after its enrollment owner changes during a transfer.
+  const pupilAssignments = await db.assignment.findMany({
+    where: {
+      enrollment: {
+        studentId: { in: session.statuses.map((s) => s.enrollment.studentId) },
+      },
+      dueDate: { in: [dayDate(date), dayDate(nextDay(date))] },
+    },
+    include: { enrollment: { select: { studentId: true } } },
+    orderBy: [
+      { enrollment: { active: "desc" } },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ],
+  });
   const since = dayDate(date);
   since.setUTCDate(since.getUTCDate() - 29);
   // One bounded query for the whole class, restricted to this teacher's halqa.
@@ -135,21 +153,27 @@ export async function getDay(
       ? []
       : await db.dailyStudentStatus.findMany({
           where: {
-            halqaId,
-            session: {
-              date: { gte: since, lte: dayDate(date) },
-              halqa: { teacherId },
+            enrollment: {
+              studentId: {
+                in: session.statuses.map((s) => s.enrollment.studentId),
+              },
             },
+            session: { date: { gte: since, lte: dayDate(date) } },
           },
           include: {
             session: { select: { date: true } },
+            enrollment: { select: { studentId: true } },
             entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
           },
         });
   const histories = new Map<string, Parameters<typeof suggestAssignment>[0]>();
   for (const h of history) {
     if (h.outcome === "ABSENT") continue;
-    const days = histories.get(h.enrollmentId) ?? [];
+    const currentEnrollment = session.statuses.find(
+      (s) => s.enrollment.studentId === h.enrollment.studentId,
+    )?.enrollmentId;
+    if (!currentEnrollment) continue;
+    const days = histories.get(currentEnrollment) ?? [];
     days.push({
       date: h.session.date.toISOString().slice(0, 10),
       entries: h.entries.map((e, index) => ({
@@ -168,7 +192,7 @@ export async function getDay(
         pageAmount: e.pageAmount === null ? null : Number(e.pageAmount),
       })),
     });
-    histories.set(h.enrollmentId, days);
+    histories.set(currentEnrollment, days);
   }
   const memorySequences = await readMemorySequences(
     db,
@@ -225,14 +249,18 @@ export async function getDay(
         pageMappingVersion: e.pageMappingVersion,
       })),
       today: assignmentView(
-        s.enrollment.assignments.find(
-          (a) => a.dueDate.toISOString().slice(0, 10) === date,
+        pupilAssignments.find(
+          (a) =>
+            a.enrollment.studentId === s.enrollment.studentId &&
+            a.dueDate.toISOString().slice(0, 10) === date,
         ),
         s.reviewOnly,
       ),
       tomorrow: assignmentView(
-        s.enrollment.assignments.find(
-          (a) => a.dueDate.toISOString().slice(0, 10) === nextDay(date),
+        pupilAssignments.find(
+          (a) =>
+            a.enrollment.studentId === s.enrollment.studentId &&
+            a.dueDate.toISOString().slice(0, 10) === nextDay(date),
         ),
         s.reviewOnly,
       ),
