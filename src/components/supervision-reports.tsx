@@ -25,7 +25,6 @@ export default function SupervisionReports({
     [enrollmentId, setEnrollmentId] = useState("");
   const [minDays, setMinDays] = useState("3"),
     [mastery, setMastery] = useState("70"),
-    [absenceMin, setAbsenceMin] = useState("3"),
     [maxAbsences, setMaxAbsences] = useState("0");
   const [snapshot, setSnapshot] = useState<{
       query: string;
@@ -40,7 +39,6 @@ export default function SupervisionReports({
     to: dates.to,
     minDays,
     mastery,
-    absenceMin,
     maxAbsences,
   });
   if (halqaId && type !== "comprehensive") params.set("halqaId", halqaId);
@@ -53,6 +51,10 @@ export default function SupervisionReports({
     setBusy(true);
     setError("");
     try {
+      if (type === "support" && dates.to > today)
+        throw Error(
+          "الأسبوع لم يكتمل؛ اختر أسبوعًا سابقًا من الاثنين إلى الجمعة",
+        );
       const r = await fetch(`/api/supervisor/reports?${query}`, {
         cache: "no-store",
       });
@@ -84,6 +86,10 @@ export default function SupervisionReports({
             onChange={(e) => {
               const t = e.target.value as keyof typeof reportTitles;
               setType(t);
+              if (t === "support") {
+                setPreset("previous-week");
+                setDates(reportPeriod("previous-week", today));
+              }
               setMastery(t === "excellent" ? "90" : "70");
               setError("");
             }}
@@ -106,17 +112,44 @@ export default function SupervisionReports({
                 setDates(reportPeriod(e.target.value, today));
             }}
           >
-            <option value="week">هذا الأسبوع حتى اليوم</option>
+            <option
+              value="week"
+              disabled={
+                type === "support" &&
+                new Date(
+                  reportPeriod("week", today).from + "T00:00:00Z",
+                ).getUTCDay() === 1 &&
+                new Date(
+                  reportPeriod("week", today).from + "T00:00:00Z",
+                ).getTime() +
+                  4 * 86400000 >
+                  Date.parse(today)
+              }
+            >
+              {type === "support"
+                ? "هذا الأسبوع (بعد اكتماله)"
+                : "هذا الأسبوع حتى اليوم"}
+            </option>
             <option value="previous-week">
               الأسبوع السابق (الاثنين إلى الجمعة)
             </option>
-            <option value="month">هذا الشهر</option>
-            <option value="previous-month">الشهر السابق</option>
-            <option value="custom">فترة مخصصة</option>
+            {type !== "support" && (
+              <>
+                <option value="month">هذا الشهر</option>
+                <option value="previous-month">الشهر السابق</option>
+              </>
+            )}
+            <option value="custom">
+              {type === "support" ? "اختيار أسبوع آخر" : "فترة مخصصة"}
+            </option>
           </select>
         </label>
         {preset === "custom" && (
-          <p className="subtle">اختر فترة لا تتجاوز ٩٣ يومًا.</p>
+          <p className="subtle">
+            {type === "support"
+              ? "اختر يوم الاثنين؛ تُحدد الجمعة تلقائيًا، ولا يُصنف أسبوع لم يكتمل."
+              : "اختر فترة لا تتجاوز ٩٣ يومًا."}
+          </p>
         )}
         <div className="supervision-date-grid">
           <label>
@@ -125,10 +158,17 @@ export default function SupervisionReports({
               required
               type="date"
               max={today}
+              min={type === "support" ? "1970-01-05" : undefined}
+              step={type === "support" ? 7 : undefined}
               value={dates.from}
               onChange={(e) => {
                 setPreset("custom");
-                setDates({ ...dates, from: e.target.value });
+                const from = e.target.value;
+                if (type === "support" && from) {
+                  const friday = new Date(from + "T00:00:00Z");
+                  friday.setUTCDate(friday.getUTCDate() + 4);
+                  setDates({ from, to: friday.toISOString().slice(0, 10) });
+                } else setDates({ ...dates, from });
               }}
             />
           </label>
@@ -138,6 +178,7 @@ export default function SupervisionReports({
               required
               type="date"
               min={dates.from}
+              readOnly={type === "support"}
               max={today}
               value={dates.to}
               onChange={(e) => {
@@ -197,7 +238,14 @@ export default function SupervisionReports({
             </select>
           </label>
         )}
-        {(type === "support" || type === "excellent") && (
+        {type === "support" && (
+          <p className="notice">
+            معيار المدرسة للحفظ الجديد المتقن: أقل من 2 صفحة للأول والثاني، وأقل
+            من 5 صفحات للثالث إلى السادس، خلال أسبوع كامل. طلاب المراجعة فقط
+            مستبعدون. الغياب وتكرار غير حافظ لهما تنبيهات مستقلة.
+          </p>
+        )}
+        {type === "excellent" && (
           <fieldset className="supervision-criteria">
             <legend>
               <SlidersHorizontal size={16} /> شروط التقرير المختارة
@@ -218,7 +266,7 @@ export default function SupervisionReports({
               />
             </label>
             <label>
-              {type === "support" ? "إتقان أقل من (%)" : "إتقان لا يقل عن (%)"}
+              إتقان لا يقل عن (%)
               <input
                 type="number"
                 min="0"
@@ -228,31 +276,17 @@ export default function SupervisionReports({
                 onChange={(e) => setMastery(e.target.value)}
               />
             </label>
-            {type === "support" ? (
-              <label>
-                أو غياب بعدد أيام لا يقل عن
-                <input
-                  type="number"
-                  min="1"
-                  max="93"
-                  required
-                  value={absenceMin}
-                  onChange={(e) => setAbsenceMin(e.target.value)}
-                />
-              </label>
-            ) : (
-              <label>
-                الحد الأعلى لأيام الغياب
-                <input
-                  type="number"
-                  min="0"
-                  max="93"
-                  required
-                  value={maxAbsences}
-                  onChange={(e) => setMaxAbsences(e.target.value)}
-                />
-              </label>
-            )}
+            <label>
+              الحد الأعلى لأيام الغياب
+              <input
+                type="number"
+                min="0"
+                max="93"
+                required
+                value={maxAbsences}
+                onChange={(e) => setMaxAbsences(e.target.value)}
+              />
+            </label>
             <p className="subtle">
               نقص التسجيل وحده لا يجعل الطالب بحاجة للمتابعة. تقرير التميز
               يستبعد السجلات الناقصة، ويقيّم مسار المراجعة فقط وفق المراجعة.
@@ -280,10 +314,24 @@ export default function SupervisionReports({
             <span>{data.summary.students} طالب</span>
           </div>
           <p className="notice">{data.criteria}</p>
+          {type === "support" && data.supportUnassessedCount > 0 && (
+            <p className="notice">
+              لم يُصنف {data.supportUnassessedCount} طالبًا لعدم كفاية بيانات
+              الأسبوع أو عدم تحديد الصف. نقص البيانات لا يعني ضعف الطالب.
+            </p>
+          )}
           <div className="supervision-report-totals">
             <div>
-              <strong>{formatPages(data.summary.memoryPages)}</strong>
-              <span>صفحة حفظ مسجلة</span>
+              <strong>
+                {formatPages(
+                  type === "support"
+                    ? data.summary.masteredMemoryPages
+                    : data.summary.memoryPages,
+                )}
+              </strong>
+              <span>
+                {type === "support" ? "صفحة حفظ جديد متقن" : "صفحة حفظ مسجلة"}
+              </span>
             </div>
             <div>
               <strong>{formatPages(data.summary.reviewPages)}</strong>
@@ -324,8 +372,17 @@ export default function SupervisionReports({
                   {r.masteryRate === null ? "" : ` · إتقان ${r.masteryRate}%`}
                 </p>
                 <p>
-                  الحفظ: {formatPages(r.memoryPages)} صفحة · المراجعة:{" "}
-                  {formatPages(r.reviewPages)} صفحة
+                  {type === "support" ? (
+                    <>
+                      الحفظ الجديد المتقن: {formatPages(r.masteredMemoryPages)}{" "}
+                      صفحة · الحد الأسبوعي: {r.weeklyMinimumPages} صفحة
+                    </>
+                  ) : (
+                    <>
+                      الحفظ: {formatPages(r.memoryPages)} صفحة · المراجعة:{" "}
+                      {formatPages(r.reviewPages)} صفحة
+                    </>
+                  )}
                 </p>
                 {r.reasons.length > 0 && (
                   <p className="notice">{r.reasons.join("؛ ")}</p>
@@ -333,7 +390,9 @@ export default function SupervisionReports({
                 {r.latestNote && <p>{r.latestNote}</p>}
                 <button
                   className="text-button"
-                  onClick={() => onStudent(r.halqaId, r.enrollmentId)}
+                  onClick={() =>
+                    onStudent(r.historyHalqaId, r.historyEnrollmentId)
+                  }
                 >
                   فتح سجل الطالب ←
                 </button>

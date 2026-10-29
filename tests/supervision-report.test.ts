@@ -11,7 +11,7 @@ import { supervisionReportMarkup } from "../src/lib/supervision-report-pdf";
 import { pageAmount } from "../src/lib/quran";
 import { dayDate, dayKey } from "../src/lib/dates";
 const query = (type = "support") =>
-  supervisionReportQuery.parse({ type, from: "2026-10-01", to: "2026-10-28" });
+  supervisionReportQuery.parse({ type, from: "2026-10-19", to: "2026-10-23" });
 test("report periods respect calendar boundaries and query limits", () => {
   assert.deepEqual(reportPeriod("previous-month", "2026-03-05"), {
     from: "2026-02-01",
@@ -55,14 +55,14 @@ test("specialized criteria require evidence and do not treat missing records as 
       { assessedDays: 3, masteredDays: 0, absentDays: 0, pendingDays: 0 },
       query(),
     ).length,
-    1,
+    0,
   );
   assert.equal(
     reportReasons(
       { assessedDays: 0, masteredDays: 0, absentDays: 3, pendingDays: 0 },
       query(),
     ).length,
-    1,
+    0,
   );
   assert.equal(
     reportReasons(
@@ -175,10 +175,8 @@ test(
       );
       assert.equal(fixtureRows[0].memoryMasteredDays, 3);
       assert.equal(fixtureRows[0].reviewMasteredDays, 0);
-      const support = await getSupervisionReport({ ...raw, type: "support" });
-      assert.deepEqual(
-        support.rows.map((x) => x.enrollmentId).sort(),
-        [enrollments[0].id, enrollments[2].id].sort(),
+      await assert.rejects(() =>
+        getSupervisionReport({ ...raw, type: "support" }),
       );
       const excellent = await getSupervisionReport({
         ...raw,
@@ -189,17 +187,13 @@ test(
         [enrollments[1].id],
       );
       assert.equal(excellent.rows[0].masteryRate, 100);
-      assert.equal(
-        (
-          await getSupervisionReport({
-            ...raw,
-            type: "support",
-            minDays: 4,
-            absenceMin: 4,
-          })
-        ).rows.length,
-        0,
-      );
+      const support = await getSupervisionReport({
+        ...raw,
+        type: "support",
+        from: "2026-10-19",
+        to: "2026-10-23",
+      });
+      assert.equal(support.rows.length, 0);
       const absence = await getSupervisionReport({ ...raw, type: "absence" });
       assert.equal(absence.rows.length, 1);
       assert.equal(absence.rows[0].absentDates.length, 3);
@@ -222,7 +216,7 @@ test(
         () =>
           getSupervisionReport({
             ...raw,
-            type: "support",
+            type: "absence",
             halqaId: "not-a-class",
           }),
         /الحلقة غير موجودة/,

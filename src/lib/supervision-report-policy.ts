@@ -33,6 +33,13 @@ export const supervisionReportQuery = z
       q.from <= q.to && (Date.parse(q.to) - Date.parse(q.from)) / 86400000 < 93,
     { message: "اختر فترة صحيحة لا تتجاوز ٩٣ يومًا" },
   )
+  .refine(
+    (q) =>
+      q.type !== "support" ||
+      (new Date(q.from + "T00:00:00Z").getUTCDay() === 1 &&
+        (Date.parse(q.to) - Date.parse(q.from)) / 86400000 === 4),
+    { message: "تقرير المتابعة يحتاج أسبوعًا كاملًا من الاثنين إلى الجمعة" },
+  )
   .refine((q) => q.type !== "student" || !!q.enrollmentId, {
     message: "اختر الطالب",
   })
@@ -43,7 +50,7 @@ export const supervisionReportQuery = z
 export type SupervisionReportQuery = z.infer<typeof supervisionReportQuery>;
 export function reportCriteria(q: SupervisionReportQuery) {
   if (q.type === "support")
-    return `إتقان أقل من ${q.mastery}% بعد ${q.minDays} أيام مقيمة على الأقل، أو غياب ${q.absenceMin} أيام فأكثر. نقص التسجيل وحده لا يصنف الطالب بحاجة للمتابعة.`;
+    return "معيار المدرسة للحفظ الجديد المتقن خلال أسبوع كامل: أقل من 2 صفحة للصفين الأول والثاني، وأقل من 5 صفحات للصفوف الثالث إلى السادس. طلاب المراجعة فقط خارج المعيار. الغياب أو تكرار غير حافظ ليس معيارًا بديلًا للمقدار؛ التنبيهات مستقلة. لا يُصنف الطالب عند نقص بيانات الحفظ أو الحضور خلال الأسبوع.";
   if (q.type === "excellent")
     return `إتقان ${q.mastery}% فأكثر بعد ${q.minDays} أيام مقيمة على الأقل، وغياب لا يزيد عن ${q.maxAbsences} أيام، دون سجلات ناقصة خلال الفترة. هذه شروط التقرير المختارة وليست اعتمادًا لشهادة.`;
   if (q.type === "absence")
@@ -61,13 +68,8 @@ export function reportReasons(
   q: SupervisionReportQuery,
 ): string[] {
   const rate = m.assessedDays ? (m.masteredDays / m.assessedDays) * 100 : null;
-  if (q.type === "support")
-    return [
-      rate !== null && m.assessedDays >= q.minDays && rate < q.mastery
-        ? `إتقان ${Math.round(rate)}% في ${m.assessedDays} أيام مقيمة`
-        : "",
-      m.absentDays >= q.absenceMin ? `غياب ${m.absentDays} أيام` : "",
-    ].filter(Boolean);
+  // Weekly page thresholds are evaluated with the pupil's full-week memory data.
+  if (q.type === "support") return [];
   if (q.type === "excellent")
     return rate !== null &&
       m.assessedDays >= q.minDays &&

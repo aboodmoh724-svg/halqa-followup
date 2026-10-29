@@ -79,21 +79,21 @@ function specialized(report: SupervisionReport) {
         report.query.type === "absence"
           ? "<th>الطالب</th><th>أيام الغياب</th><th>التواريخ</th><th>ملاحظات الفترة</th>"
           : report.query.type === "support"
-            ? "<th>الطالب</th><th>سبب المتابعة</th><th>حافظ في الحفظ</th><th>حافظ في المراجعة</th>"
+            ? "<th>الطالب</th><th>سبب المتابعة</th><th>الحفظ المتقن<br>صفحة</th><th>الحد الأسبوعي<br>صفحة</th>"
             : "<th>الطالب</th><th>الحفظ<br>صفحة</th><th>المراجعة<br>صفحة</th><th>حافظ في الحفظ</th><th>حافظ في المراجعة</th>";
       const body = rows
         .map((r) =>
           report.query.type === "absence"
             ? `<tr><th>${escape(r.name)}</th><td>${n(r.absentDays)}</td><td>${r.absentDates.map((d) => `<bdi>${escape(d)}</bdi>`).join("<br>")}</td><td class="note">${noteCell(r)}</td></tr>`
             : report.query.type === "support"
-              ? `<tr><th>${escape(r.name)}${r.reviewOnly ? "<small>مراجعة فقط</small>" : ""}</th><td class="note">${r.reasons.map(escape).join("<br>")}${r.latestNote ? `<p>${escape(r.latestNote)}</p>` : ""}</td><td>${r.reviewOnly ? "—" : ratio(r.memoryMasteredDays, r.memoryAssessedDays)}</td><td>${ratio(r.reviewMasteredDays, r.reviewAssessedDays)}</td></tr>`
+              ? `<tr><th>${escape(r.name)}${r.reviewOnly ? "<small>مراجعة فقط</small>" : ""}</th><td class="note">${r.reasons.map(escape).join("<br>")}${r.latestNote ? `<p>${escape(r.latestNote)}</p>` : ""}</td><td>${n(r.masteredMemoryPages)}</td><td>${r.weeklyMinimumPages ?? "—"}</td></tr>`
               : `<tr><th>${escape(r.name)}${r.reviewOnly ? "<small>مراجعة فقط</small>" : ""}</th><td>${r.reviewOnly ? "—" : n(r.memoryPages)}</td><td>${n(r.reviewPages)}</td><td>${r.reviewOnly ? "—" : ratio(r.memoryMasteredDays, r.memoryAssessedDays)}</td><td>${ratio(r.reviewMasteredDays, r.reviewAssessedDays)}</td></tr>`,
         )
         .join("");
       return `<section class="special-class"><table><thead><tr><th colspan="${report.query.type === "excellent" ? 5 : 4}" class="continued">${escape(c.name)} · ${escape(c.teacherName)}</th></tr><tr>${head}</tr></thead><tbody>${body}</tbody></table>${notesAppendix(rows)}</section>`;
     })
     .join("");
-  return `${heading(report, report.title, lead)}<div class="metrics">${metric("الطلاب", s.students)}${metric("الحفظ · صفحة", s.memoryPages)}${metric("المراجعة · صفحة", s.reviewPages)}${metric("الغياب · أيام", s.absentDays)}</div><p class="criteria">${escape(report.criteria)}</p><p class="explain">شروط التقرير المختارة لا تعني اعتماد شهادة أو تشخيصًا نهائيًا لمستوى الطالب. النسب لا تقيس نسبة حفظ المصحف.</p>${sections || '<p class="empty">لا يوجد طلاب مطابقون للشروط في الفترة المحددة.</p>'}`;
+  return `${heading(report, report.title, lead)}<div class="metrics">${metric("الطلاب", s.students)}${metric(report.query.type === "support" ? "الحفظ الجديد المتقن · صفحة" : "الحفظ · صفحة", report.query.type === "support" ? s.masteredMemoryPages : s.memoryPages)}${metric("المراجعة · صفحة", s.reviewPages)}${metric("الغياب · أيام", s.absentDays)}</div><p class="criteria">${escape(report.criteria)}</p>${report.query.type === "support" && report.supportUnassessedCount ? `<p class="explain">لم يُصنف ${n(report.supportUnassessedCount)} طالبًا لعدم كفاية بيانات الأسبوع أو عدم تحديد الصف. لا يعني ذلك ضعف الطالب.</p>` : ""}<p class="explain">شروط التقرير المختارة لا تعني اعتماد شهادة أو تشخيصًا نهائيًا لمستوى الطالب. النسب لا تقيس نسبة حفظ المصحف.</p>${sections || '<p class="empty">لا يوجد طلاب مطابقون للشروط في الفترة المحددة.</p>'}`;
 }
 export function supervisionReportMarkup(
   report: SupervisionReport,
