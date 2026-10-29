@@ -119,6 +119,8 @@ model RecitationEntry {
 model Assignment {
   autoMemorizationStatusId String?
   memorizationManual Boolean @default(false)
+  autoReviewStatusId String?
+  reviewManual Boolean @default(false)
   id String @id @default(cuid())
   enrollmentId String
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id])

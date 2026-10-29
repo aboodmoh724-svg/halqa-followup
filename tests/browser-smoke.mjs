@@ -137,10 +137,23 @@ try {
       [25, 29],
       [30, 37],
     ];
+    const reviewRanges = [
+      [1, 16],
+      [17, 29],
+      [30, 48],
+      [49, 61],
+      [62, 76],
+    ];
     try {
+      await historyDb.assignment.deleteMany({
+        where: {
+          enrollmentId: scheduleDay.students[2].enrollmentId,
+          dueDate: new Date(scheduleDay.date + "T00:00:00Z"),
+        },
+      });
       for (let i = 0; i < 5; i++) {
         const historyDate = new Date(`${scheduleDay.date}T00:00:00Z`);
-        historyDate.setUTCDate(historyDate.getUTCDate() - 5 + i);
+        historyDate.setUTCDate(historyDate.getUTCDate() - [7, 6, 3, 2, 1][i]);
         const session = await historyDb.dailySession.create({
           data: {
             halqaId: scheduleDay.halqaId,
@@ -157,15 +170,26 @@ try {
             memorizationResult: "MASTERED",
             reviewResult: "MASTERED",
             entries: {
-              create: {
-                kind: "MEMORIZATION",
-                assessment: "MASTERED",
-                startSurah: 2,
-                endSurah: 2,
-                startAyah: ranges[i][0],
-                endAyah: ranges[i][1],
-                requestKey: randomUUID(),
-              },
+              create: [
+                {
+                  kind: "MEMORIZATION",
+                  assessment: "MASTERED",
+                  startSurah: 2,
+                  endSurah: 2,
+                  startAyah: ranges[i][0],
+                  endAyah: ranges[i][1],
+                  requestKey: randomUUID(),
+                },
+                {
+                  kind: "REVIEW",
+                  assessment: "MASTERED",
+                  startSurah: 2,
+                  endSurah: 2,
+                  startAyah: reviewRanges[i][0],
+                  endAyah: reviewRanges[i][1],
+                  requestKey: randomUUID(),
+                },
+              ],
             },
           },
         });
@@ -179,6 +203,32 @@ try {
       .click();
     await page.locator('main[aria-busy="false"]').waitFor();
     await page.getByRole("button", { name: /عمر محمود حسن/ }).click();
+    for (const [button, label, start] of [
+      ["+ حفظ جديد", "الحفظ", "38"],
+      ["+ مراجعة", "المراجعة", "77"],
+    ]) {
+      await page.getByRole("button", { name: button, exact: true }).click();
+      const modal = page.getByRole("dialog");
+      await modal
+        .getByRole("button", { name: `استخدام اقتراح ${label}`, exact: true })
+        .click();
+      assert.equal(
+        await modal.getByRole("spinbutton").first().inputValue(),
+        start,
+      );
+      assert.equal(
+        await modal
+          .getByRole("button", { name: "حافظ", exact: true })
+          .getAttribute("aria-pressed"),
+        "false",
+      );
+      const end = modal.getByRole("spinbutton").nth(1);
+      await end.fill(String(Number(await end.inputValue()) - 1));
+      await page.screenshot({
+        path: `work/smoke/${label === "الحفظ" ? "memory" : "review"}-suggestion.png`,
+      });
+      await modal.getByRole("button", { name: "إغلاق", exact: true }).click();
+    }
     await page
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
@@ -194,6 +244,17 @@ try {
         .inputValue(),
       "38",
     );
+    await proposalDialog
+      .getByRole("button", { name: "استخدام اقتراح المراجعة", exact: true })
+      .click();
+    assert.equal(
+      await proposalDialog
+        .getByRole("group", { name: "مدى المراجعة", exact: true })
+        .getByRole("spinbutton")
+        .first()
+        .inputValue(),
+      "77",
+    );
     await page.screenshot({ path: "work/smoke/assignment-suggestion.png" });
     await proposalDialog
       .getByRole("button", { name: "إغلاق", exact: true })
@@ -201,8 +262,112 @@ try {
     const untouched = await (
       await context.request.get(`${base}/api/halqas/${scheduleDay.halqaId}`)
     ).json();
-    assert.equal(untouched.students[0].entries.length, 0);
-    assert.equal(untouched.students[0].tomorrow, null);
+    assert.equal(untouched.students[2].entries.length, 0);
+    assert.equal(untouched.students[2].tomorrow, null);
+    const { PrismaClient: DutyFixture } = await import("@prisma/client");
+    const dutyDb = new DutyFixture();
+    try {
+      await dutyDb.assignment.create({
+        data: {
+          enrollmentId: scheduleDay.students[2].enrollmentId,
+          dueDate: new Date(scheduleDay.date + "T00:00:00Z"),
+          memorization: {
+            startSurah: 2,
+            startAyah: 40,
+            endSurah: 2,
+            endAyah: 48,
+          },
+          review: { startSurah: 2, startAyah: 80, endSurah: 2, endAyah: 91 },
+        },
+      });
+    } finally {
+      await dutyDb.$disconnect();
+    }
+    await page.reload();
+    await page.getByRole("button", { name: /عمر محمود حسن/ }).click();
+    await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
+    assert.equal(
+      await proposalDialog.getByRole("spinbutton").first().inputValue(),
+      "40",
+    );
+    await proposalDialog
+      .getByText("اقتراح اختياري حسب المعدل", { exact: true })
+      .click();
+    assert.equal(
+      await proposalDialog.getByRole("spinbutton").first().inputValue(),
+      "40",
+    );
+    await proposalDialog
+      .getByRole("button", { name: "استخدام اقتراح الحفظ", exact: true })
+      .click();
+    assert.equal(
+      await proposalDialog.getByRole("spinbutton").first().inputValue(),
+      "38",
+    );
+    await proposalDialog
+      .getByRole("button", { name: "إغلاق", exact: true })
+      .click();
+    const dutyUnchanged = await (
+      await context.request.get(`${base}/api/halqas/${scheduleDay.halqaId}`)
+    ).json();
+    assert.equal(dutyUnchanged.students[2].today.memorization.startAyah, 40);
+    assert.equal(dutyUnchanged.students[2].entries.length, 0);
+    await page
+      .getByRole("button", { name: "+ واجب الغد", exact: true })
+      .click();
+    await proposalDialog
+      .getByRole("button", { name: "استخدام اقتراح الحفظ", exact: true })
+      .click();
+    await proposalDialog
+      .getByRole("button", { name: "استخدام اقتراح المراجعة", exact: true })
+      .click();
+    await proposalDialog
+      .getByRole("button", { name: "حفظ", exact: true })
+      .click();
+    await proposalDialog.waitFor({ state: "hidden" });
+    const savedProposal = await (
+      await context.request.get(`${base}/api/halqas/${scheduleDay.halqaId}`)
+    ).json();
+    const savedDuty = savedProposal.students[2].tomorrow;
+    await page
+      .getByRole("button", { name: "+ واجب الغد", exact: true })
+      .click();
+    assert.equal(
+      await proposalDialog
+        .getByRole("button", { name: "استخدام اقتراح الحفظ", exact: true })
+        .count(),
+      0,
+    );
+    await proposalDialog
+      .getByRole("button", { name: "تعديل واجب الحفظ", exact: true })
+      .click();
+    await proposalDialog
+      .getByRole("button", { name: "استخدام اقتراح الحفظ", exact: true })
+      .click();
+    const editedEnd = proposalDialog
+      .getByRole("group", { name: "مدى الحفظ", exact: true })
+      .getByRole("spinbutton")
+      .nth(1);
+    await editedEnd.fill(String(Number(await editedEnd.inputValue()) - 1));
+    assert.equal(
+      await proposalDialog
+        .getByRole("group", { name: "مدى المراجعة", exact: true })
+        .count(),
+      0,
+    );
+    await proposalDialog
+      .getByRole("button", { name: "حفظ", exact: true })
+      .click();
+    await proposalDialog.waitFor({ state: "hidden" });
+    const editedProposal = await (
+      await context.request.get(`${base}/api/halqas/${scheduleDay.halqaId}`)
+    ).json();
+    assert.equal(editedProposal.students[2].tomorrow.id, savedDuty.id);
+    assert.deepEqual(
+      editedProposal.students[2].tomorrow.review,
+      savedDuty.review,
+    );
+    assert.equal(editedProposal.students[2].entries.length, 0);
     await page.getByRole("button", { name: "الطلاب ←", exact: true }).click();
     await page.getByRole("button", { name: /محمد أحمد علي/ }).click();
     await page.getByRole("button", { name: "+ حفظ جديد", exact: true }).click();
@@ -264,6 +429,16 @@ try {
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
     assert.equal(await dialog.getByLabel("اسم الصورة (نص فقط)").count(), 0);
+    await dialog.getByText(/الطالب غير حافظ المراجعة:/).waitFor();
+    const reviewCarry = await (
+      await context.request.get(`${base}/api/halqas/${scheduleDay.halqaId}`)
+    ).json();
+    assert(reviewCarry.students[0].tomorrow.autoReviewStatusId);
+    assert.deepEqual(
+      reviewCarry.students[0].tomorrow.review,
+      reviewCarry.students[0].today.review,
+    );
+    await page.screenshot({ path: "work/smoke/review-auto-carry.png" });
     await dialog.getByLabel("واجب حفظ", { exact: true }).check();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
@@ -277,7 +452,10 @@ try {
         .count(),
       0,
     );
-    await dialog.getByLabel("واجب مراجعة", { exact: true }).check();
+    await dialog.getByText("تم تسجيل واجب المراجعة", { exact: true }).waitFor();
+    await dialog
+      .getByRole("button", { name: "تعديل واجب المراجعة", exact: true })
+      .click();
     await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     await page
@@ -418,7 +596,7 @@ try {
     await page
       .getByRole("button", { name: "+ واجب الغد", exact: true })
       .click();
-    await dialog.getByText(/أبقينا واجب الغد/).waitFor();
+    await dialog.getByText(/أبقينا اختيارك اليدوي لواجب الحفظ/).waitFor();
     await dialog
       .getByRole("button", { name: "تعديل واجب الحفظ", exact: true })
       .click();
@@ -508,6 +686,15 @@ try {
       true,
     );
     await page.screenshot({ path: "work/smoke/absence.png" });
+    const absentCarry = await (await context.request.get(url)).json();
+    assert.deepEqual(
+      absentCarry.students[1].tomorrow.memorization,
+      absentCarry.students[1].today.memorization,
+    );
+    assert.deepEqual(
+      absentCarry.students[1].tomorrow.review,
+      absentCarry.students[1].today.review,
+    );
     await page
       .getByRole("button", { name: "حضر الطالب — إلغاء الغياب", exact: true })
       .click();

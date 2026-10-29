@@ -6,13 +6,13 @@ import type { EntryView } from "../src/lib/types";
 
 const history = (surah = 2) =>
   Array.from({ length: 5 }, (_, i) => ({
-    date: `2026-10-${10 + i}`,
+    date: `2026-10-${[22, 23, 26, 27, 28][i]}`,
     entries: [
       {
         id: String(i),
         kind: "MEMORIZATION",
         assessment: "MASTERED",
-        createdAt: `2026-10-${10 + i}T09:00:00Z`,
+        createdAt: `2026-10-${[22, 23, 26, 27, 28][i]}T09:00:00Z`,
         pageAmount: null,
         pageMappingVersion: null,
         startSurah: surah,
@@ -65,11 +65,95 @@ test("unknown chapter direction and unstable daily amounts produce no guess", ()
   }));
   assert.equal(suggestAssignment(unknown, "MEMORIZATION"), null);
   const unstable = history();
-  unstable[0].entries = Array.from(
-    { length: 12 },
-    () => unstable[0].entries[0],
-  );
+  unstable[0].entries = [
+    { ...unstable[0].entries[0], startAyah: 1, endAyah: 286 },
+  ];
   assert.equal(suggestAssignment(unstable, "MEMORIZATION"), null);
+});
+test("repeats and overlapping attempts do not inflate the suggested daily amount", () => {
+  const days = history(),
+    baseline = suggestAssignment(days, "MEMORIZATION")!;
+  days[2].entries.push({ ...days[2].entries[0], id: "repeat", startAyah: 18 });
+  assert.equal(
+    suggestAssignment(days, "MEMORIZATION")?.averagePages,
+    baseline.averagePages,
+  );
+  const four = history().slice(0, 4);
+  assert.equal(
+    suggestAssignment(
+      [
+        ...four,
+        { ...four[0], entries: [{ ...four[0].entries[0], id: "same-day" }] },
+      ],
+      "MEMORIZATION",
+    ),
+    null,
+  );
+});
+test("five prior school days set the average while today's partial entry only advances the start", () => {
+  const prior = history(),
+    baseline = suggestAssignment(prior, "MEMORIZATION")!;
+  const today = {
+    date: "2026-10-29",
+    entries: [
+      {
+        ...prior[0].entries[0],
+        id: "today",
+        createdAt: "2026-10-29T09:00:00Z",
+        startAyah: 38,
+        endAyah: 39,
+      },
+    ],
+  };
+  const proposal = suggestAssignment([...prior, today], "MEMORIZATION", {
+    beforeDate: today.date,
+    throughDate: today.date,
+  })!;
+  assert.equal(proposal.averagePages, baseline.averagePages);
+  assert.equal(proposal.range.startAyah, 40);
+  assert.equal(
+    suggestAssignment(
+      [
+        ...prior,
+        {
+          ...today,
+          entries: today.entries.map((e) => ({
+            ...e,
+            assessment: "NOT_MASTERED",
+          })),
+        },
+      ],
+      "MEMORIZATION",
+      { beforeDate: today.date },
+    ),
+    null,
+  );
+});
+test("recent difficult days are not silently replaced by older successes; kinds stay independent", () => {
+  const days = history();
+  const older = {
+    ...days[0],
+    date: "2026-10-21",
+    entries: days[0].entries.map((e) => ({ ...e, id: "older" })),
+  };
+  days[2].entries[0].assessment = "NOT_MASTERED";
+  assert.equal(suggestAssignment([older, ...days], "MEMORIZATION"), null);
+  const review = history().map((d) => ({
+    ...d,
+    entries: d.entries.map((e) => ({
+      ...e,
+      id: "review" + e.id,
+      kind: "REVIEW" as const,
+    })),
+  }));
+  assert(suggestAssignment([...days, ...review], "REVIEW"));
+});
+test("a disproportionately long next verse is not proposed as a usual small amount", () => {
+  const tiny = history().map((d) => ({
+    ...d,
+    entries: d.entries.map((e) => ({ ...e, startAyah: 280, endAyah: 281 })),
+  }));
+  assert.equal(suggestAssignment(tiny, "MEMORIZATION"), null);
 });
 
 test("reverse chapter movement keeps ascending verses and does not repeat the last range", () => {
