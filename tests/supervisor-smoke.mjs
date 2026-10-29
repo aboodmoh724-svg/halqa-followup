@@ -45,6 +45,9 @@ const t = await db.teacher.create({
   }),
   s = await db.student.create({ data: { name: "طالب تجربة الإشراف" } }),
   e = await db.enrollment.create({ data: { studentId: s.id, halqaId: h.id } });
+const transferTarget = await db.halqa.create({
+  data: { name: "حلقة الاستقبال التجريبية", teacherId: t.id },
+});
 const page = await context.newPage(),
   errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
@@ -405,6 +408,108 @@ try {
     ).length,
     0,
   );
+  const transferUrl = `${base}/api/supervisor/halqas/${h.id}/students/${e.id}/transfer`;
+  assert.equal((await teacherContext.request.get(transferUrl)).status(), 401);
+  assert.equal(
+    (
+      await teacherContext.request.post(transferUrl, {
+        data: {},
+        headers: { origin: base },
+      })
+    ).status(),
+    401,
+  );
+  assert.equal(
+    (
+      await context.request.post(transferUrl, {
+        data: {},
+        headers: { origin: "https://foreign.example" },
+      })
+    ).status(),
+    403,
+  );
+  const originalEntryIds = (
+    await db.recitationEntry.findMany({
+      where: { dailyStatusId: currentStatus.id },
+      orderBy: { id: "asc" },
+    })
+  ).map((x) => x.id);
+  await page
+    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("button", { name: "الحلقات", exact: true })
+    .click();
+  await page.getByRole("button", { name: new RegExp(h.name) }).click();
+  await page.getByRole("button", { name: new RegExp(s.name) }).click();
+  await page
+    .getByRole("button", { name: "نقل الطالب إلى حلقة أخرى", exact: true })
+    .click();
+  const transfer = page.getByRole("region", {
+    name: "نقل الطالب",
+    exact: true,
+  });
+  await transfer
+    .getByLabel("الحلقة الجديدة", { exact: true })
+    .selectOption(transferTarget.id);
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "work/smoke/student-transfer.png",
+    fullPage: true,
+  });
+  await transfer
+    .getByRole("button", { name: "تأكيد النقل الآن", exact: true })
+    .click();
+  await page
+    .getByText("تم نقل الطالب مع الحفاظ على سجله وواجبه", { exact: true })
+    .waitFor();
+  const newEnrollment = await db.enrollment.findFirstOrThrow({
+    where: { studentId: s.id, halqaId: transferTarget.id, active: true },
+  });
+  const transferredStatus = await db.dailyStudentStatus.findUniqueOrThrow({
+    where: { id: currentStatus.id },
+  });
+  assert.equal(transferredStatus.enrollmentId, newEnrollment.id);
+  assert.deepEqual(
+    (
+      await db.recitationEntry.findMany({
+        where: { dailyStatusId: currentStatus.id },
+        orderBy: { id: "asc" },
+      })
+    ).map((x) => x.id),
+    originalEntryIds,
+  );
+  assert.equal(
+    await db.studentTransfer.count({ where: { studentId: s.id } }),
+    1,
+  );
+  const preservedHistory = await (
+    await context.request.get(
+      `${base}/api/supervisor/halqas/${transferTarget.id}/students/${newEnrollment.id}/history`,
+    )
+  ).json();
+  assert.equal(preservedHistory.summary.recordedDays, 3);
+  assert(preservedHistory.days.some((d) => d.halqaId === h.id));
+  await page.locator(".record-day").nth(1).locator("summary").click();
+  await page
+    .locator(".record-day")
+    .nth(1)
+    .getByRole("button", { name: "تصحيح هذا اليوم", exact: true })
+    .click();
+  await page
+    .getByRole("region", { name: "تصحيح سجل الطالب" })
+    .getByLabel("ما الذي تريد تصحيحه؟")
+    .selectOption("note");
+  await page
+    .getByRole("region", { name: "تصحيح سجل الطالب" })
+    .getByRole("button", { name: "إغلاق", exact: true })
+    .click();
   // Switching identities revokes the opposite session instead of mixing permissions.
   assert.equal(
     (
@@ -446,7 +551,7 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(
-    "Supervisor smoke passed: unified login, role switching, reports/PDF, dates/criteria, CSRF, throttling, secure cookies, mobile views, audited correction and role isolation.",
+    "Supervisor smoke passed: unified login, role switching, reports/PDF, dates/criteria, CSRF, throttling, secure cookies, mobile views, audited correction, immediate student transfer and role isolation.",
   );
 } catch (error) {
   await page.screenshot({
@@ -457,15 +562,22 @@ try {
   throw error;
 } finally {
   await browser.close();
+  await db.studentTransfer.deleteMany({ where: { studentId: s.id } });
   await db.supervisorCorrection.deleteMany({ where: { enrollmentId: e.id } });
   await db.recitationEntry.deleteMany({
-    where: { dailyStatus: { halqaId: h.id } },
+    where: { dailyStatus: { enrollment: { studentId: s.id } } },
   });
-  await db.dailyStudentStatus.deleteMany({ where: { halqaId: h.id } });
-  await db.dailySession.deleteMany({ where: { halqaId: h.id } });
-  await db.enrollment.delete({ where: { id: e.id } });
+  await db.dailyStudentStatus.deleteMany({
+    where: { enrollment: { studentId: s.id } },
+  });
+  await db.dailySession.deleteMany({
+    where: { halqaId: { in: [h.id, transferTarget.id] } },
+  });
+  await db.enrollment.deleteMany({ where: { studentId: s.id } });
   await db.student.delete({ where: { id: s.id } });
-  await db.halqa.delete({ where: { id: h.id } });
+  await db.halqa.deleteMany({
+    where: { id: { in: [h.id, transferTarget.id] } },
+  });
   await db.teacher.delete({ where: { id: t.id } });
   await db.supervisor.delete({ where: { id: supervisor.id } });
   await db.$disconnect();

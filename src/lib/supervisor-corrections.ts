@@ -53,17 +53,20 @@ async function read(
     include: {
       entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
       session: true,
-      enrollment: { select: { student: { select: { name: true } } } },
+      enrollment: { select: { student: { select: { name: true, id: true } } } },
     },
   });
   if (!status) throw new HttpError(404, "لا يوجد سجل لهذا الطالب في هذا اليوم");
-  const assignment = await tx.assignment.findUnique({
+  const assignment = await tx.assignment.findFirst({
     where: {
-      enrollmentId_dueDate: {
-        enrollmentId,
-        dueDate: dayDate(nextAssignmentDay(date)),
-      },
+      enrollment: { studentId: status.enrollment.student.id },
+      dueDate: dayDate(nextAssignmentDay(date)),
     },
+    orderBy: [
+      { enrollment: { active: "desc" } },
+      { updatedAt: "desc" },
+      { id: "asc" },
+    ],
   });
   const snapshot = json({ status, assignment });
   return {
@@ -215,20 +218,26 @@ export async function correctStudent(
             autoMemorizationStatusId: null,
             autoReviewStatusId: null,
           };
-          await tx.assignment.upsert({
-            where: {
-              enrollmentId_dueDate: {
+          if (before.assignment)
+            await tx.assignment.update({
+              where: { id: before.assignment.id },
+              data,
+            });
+          else
+            await tx.assignment.upsert({
+              where: {
+                enrollmentId_dueDate: {
+                  enrollmentId,
+                  dueDate: dayDate(nextAssignmentDay(m.date)),
+                },
+              },
+              create: {
                 enrollmentId,
                 dueDate: dayDate(nextAssignmentDay(m.date)),
+                ...data,
               },
-            },
-            create: {
-              enrollmentId,
-              dueDate: dayDate(nextAssignmentDay(m.date)),
-              ...data,
-            },
-            update: data,
-          });
+              update: data,
+            });
         }
         // Preserve historical submission state; current-day corrections reopen for teacher review.
         if (m.date === dayKey() && session.closedAt)

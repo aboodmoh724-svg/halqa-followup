@@ -15,6 +15,7 @@ import { academyName } from "@/lib/branding";
 import { assessmentLabels, type Assessment } from "@/lib/types";
 import type { SupervisorOverview } from "@/lib/supervisor-service";
 import AcademyLogo from "./academy-logo";
+import StudentTransfer from "./student-transfer";
 import StudentHistory from "./student-history";
 import SupervisionReports from "./supervision-reports";
 type View = SupervisorOverview & { supervisor: { name: string } };
@@ -33,6 +34,7 @@ const tabs = [
 const grade = (value: string | null) =>
   value ? assessmentLabels[value as Assessment] || "نتيجة سابقة" : "لم تُسجل";
 export default function SupervisorWorkspace() {
+  const [success, setSuccess] = useState("");
   const [data, setData] = useState<View | null>(null),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
@@ -153,6 +155,11 @@ export default function SupervisorWorkspace() {
           <LogOut size={21} />
         </button>
       </header>
+      {success && (
+        <p className="notice" role="status">
+          {success}
+        </p>
+      )}
       {error && (
         <p className="notice error" role="alert">
           {error}
@@ -177,13 +184,25 @@ export default function SupervisorWorkspace() {
             <BookOpen size={26} />
           </div>
           {student ? (
-            <StudentHistory
-              key={student.id}
-              supervisor
-              halqaId={selectedClass.id}
-              enrollmentId={student.id}
-              today={data.date}
-            />
+            <>
+              <StudentTransfer
+                key={student.id}
+                halqaId={selectedClass.id}
+                enrollmentId={student.id}
+                onTransferred={async (result) => {
+                  await load();
+                  openStudent(result.halqaId, result.enrollmentId);
+                  setSuccess("تم نقل الطالب مع الحفاظ على سجله وواجبه");
+                }}
+              />
+              <StudentHistory
+                key={student.id}
+                supervisor
+                halqaId={selectedClass.id}
+                enrollmentId={student.id}
+                today={data.date}
+              />
+            </>
           ) : (
             <>
               <p className="notice">

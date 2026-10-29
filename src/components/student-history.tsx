@@ -48,7 +48,11 @@ export default function StudentHistory({
   today: string;
   supervisor?: boolean;
 }) {
-  const [correctionDate, setCorrectionDate] = useState<string | null>(null);
+  const [correctionDate, setCorrectionDate] = useState<{
+    date: string;
+    halqaId: string;
+    enrollmentId: string;
+  } | null>(null);
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"overview" | "week" | "all">("overview");
   const [weekEnd, setWeekEnd] = useState(today);
@@ -133,10 +137,10 @@ export default function StudentHistory({
       )}
       {supervisor && correctionDate && (
         <SupervisorCorrection
-          key={correctionDate}
-          halqaId={halqaId}
-          enrollmentId={enrollmentId}
-          date={correctionDate}
+          key={`${correctionDate.halqaId}:${correctionDate.date}`}
+          halqaId={correctionDate.halqaId}
+          enrollmentId={correctionDate.enrollmentId}
+          date={correctionDate.date}
           onClose={() => setCorrectionDate(null)}
           onSaved={() => {
             setCorrectionDate(null);
@@ -399,12 +403,19 @@ export default function StudentHistory({
                     </span>
                   </summary>
                   <div className="record-day-body">
+                    {day.halqaName && (
+                      <p className="eyebrow">حلقة {day.halqaName}</p>
+                    )}
                     {supervisor && (
                       <button
                         className="secondary"
                         onClick={() => {
                           setSaved(false);
-                          setCorrectionDate(day.date);
+                          setCorrectionDate({
+                            date: day.date,
+                            halqaId: day.halqaId ?? halqaId,
+                            enrollmentId: day.enrollmentId ?? enrollmentId,
+                          });
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
                       >
@@ -512,8 +523,8 @@ export default function StudentHistory({
             </button>
           )}
           <p className="record-caption space">
-            السجل المتاح في حلقة {data.halqaName}. لا يُستنتج إتقان جزء أو
-            استحقاق شهادة من مجموع التسميع.
+            يحفظ السجل حلقة كل يوم، ويستمر مع الطالب عند نقله. لا يُستنتج إتقان
+            جزء أو استحقاق شهادة من مجموع التسميع.
           </p>
         </>
       )}

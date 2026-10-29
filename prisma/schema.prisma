@@ -180,3 +180,19 @@ model SupervisorCorrection {
  createdAt DateTime @default(now())
  @@index([enrollmentId, date, createdAt])
 }
+
+model StudentTransfer {
+ sequence Int @unique @default(autoincrement())
+ id String @id @default(cuid())
+ studentId String
+ sourceEnrollmentId String
+ targetEnrollmentId String
+ sourceHalqaId String
+ targetHalqaId String
+ supervisorId String
+ requestKey String @unique
+ before Json
+ after Json
+ createdAt DateTime @default(now())
+ @@index([studentId, createdAt])
+}
