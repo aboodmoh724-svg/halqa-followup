@@ -34,7 +34,7 @@ const initialRange: QuranRange = {
   endSurah: 1,
   endAyah: 7,
 };
-function RangeFields({
+export function RangeFields({
   title,
   value,
   onChange,

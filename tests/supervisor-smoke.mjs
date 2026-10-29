@@ -175,6 +175,69 @@ try {
     ).status(),
     400,
   );
+  const correctionUrl = `${base}/api/supervisor/halqas/${h.id}/students/${e.id}/correction`;
+  assert.equal(
+    (
+      await teacherContext.request.get(`${correctionUrl}?date=${date}`)
+    ).status(),
+    401,
+  );
+  assert.equal(
+    (
+      await teacherContext.request.post(correctionUrl, {
+        data: {},
+        headers: { origin: base },
+      })
+    ).status(),
+    401,
+  );
+  assert.equal(
+    (
+      await context.request.post(correctionUrl, {
+        data: {},
+        headers: { origin: "https://foreign.example" },
+      })
+    ).status(),
+    403,
+  );
+  await page.locator(".record-day").first().locator("summary").click();
+  await page
+    .getByRole("button", { name: "تصحيح هذا اليوم", exact: true })
+    .first()
+    .click();
+  const correction = page.getByRole("region", { name: "تصحيح سجل الطالب" });
+  await correction.getByLabel("ما الذي تريد تصحيحه؟").selectOption("note");
+  await correction
+    .getByLabel("الملاحظة", { exact: true })
+    .fill("ملاحظة مصححة من الإشراف");
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "work/smoke/supervisor-correction.png",
+    fullPage: true,
+  });
+  await correction
+    .getByRole("button", { name: "حفظ التصحيح", exact: true })
+    .click();
+  await page.getByText("تم حفظ تصحيح المشرف", { exact: true }).waitFor();
+  const corrected = await db.dailyStudentStatus.findFirst({
+    where: {
+      enrollmentId: e.id,
+      session: { date: new Date(date + "T00:00:00Z") },
+    },
+  });
+  assert.equal(corrected.note, "ملاحظة مصححة من الإشراف");
+  assert.equal(
+    await db.supervisorCorrection.count({ where: { enrollmentId: e.id } }),
+    1,
+  );
   await page
     .getByRole("navigation", { name: "أقسام الإشراف" })
     .getByRole("button", { name: "التقارير", exact: true })
@@ -383,7 +446,7 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(
-    "Supervisor smoke passed: unified login, role switching, reports/PDF, dates/criteria, CSRF, throttling, secure cookies, mobile views and read-only access.",
+    "Supervisor smoke passed: unified login, role switching, reports/PDF, dates/criteria, CSRF, throttling, secure cookies, mobile views, audited correction and role isolation.",
   );
 } catch (error) {
   await page.screenshot({
@@ -394,6 +457,7 @@ try {
   throw error;
 } finally {
   await browser.close();
+  await db.supervisorCorrection.deleteMany({ where: { enrollmentId: e.id } });
   await db.recitationEntry.deleteMany({
     where: { dailyStatus: { halqaId: h.id } },
   });
