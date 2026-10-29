@@ -502,7 +502,9 @@ try {
   assert.equal(
     await report
       .locator("ol")
-      .evaluate((el) => getComputedStyle(el).listStyleType),
+      .evaluate(
+        (el) => el.ownerDocument.defaultView.getComputedStyle(el).listStyleType,
+      ),
     "decimal",
   );
   await report.getByRole("button", { name: s.name, exact: true }).waitFor();
