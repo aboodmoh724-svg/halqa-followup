@@ -17,7 +17,8 @@ export const reportPercent = (part: number, total: number) =>
 export function schoolClassCompare(a: { name: string }, b: { name: string }) {
   const rank = (name: string) => {
     const n = name.replace(/[أإآ]/g, "ا");
-    return [
+    if (n.includes("تاهيلي")) return 0;
+    const index = [
       "الاول",
       "الثاني",
       "الثالث",
@@ -25,6 +26,7 @@ export function schoolClassCompare(a: { name: string }, b: { name: string }) {
       "الخامس",
       "السادس",
     ].findIndex((x) => n.includes(x));
+    return index < 0 ? -1 : index + 1;
   };
   const x = rank(a.name),
     y = rank(b.name);

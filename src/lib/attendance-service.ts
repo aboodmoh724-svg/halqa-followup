@@ -8,6 +8,7 @@ import { reportDate } from "./supervision-report-policy";
 import { enrollmentIdsOnDate } from "./enrollment-history";
 import { carryAbsentAssignment } from "./day-service";
 import { schoolClassCompare } from "./report-format";
+import { examinedOnDate } from "./exam-service";
 
 export type AttendanceActor = {
   kind: "TEACHER" | "SUPERVISOR";
@@ -84,6 +85,13 @@ async function read(
     where: { halqaId_date: { halqaId, date: dayDate(date) } },
     include: { statuses: { include: { entries: { select: { id: true } } } } },
   });
+  const examined = h.attendanceOnly
+    ? new Set<string>()
+    : await examinedOnDate(
+        tx,
+        enrollments.map((e) => e.studentId),
+        date,
+      );
   const rows = enrollments.map((e) => {
     const s = session?.statuses.find((s) => s.enrollmentId === e.id);
     return {
@@ -92,6 +100,7 @@ async function read(
       state: attendanceState(s),
       updatedAt: s?.updatedAt.toISOString() ?? null,
       hasRecitation: !!s?.entries.length,
+      hasExam: examined.has(e.studentId),
     };
   });
   const unknown = rows.filter((r) => r.state === null).length;
@@ -170,10 +179,14 @@ export async function confirmAttendance(
         if (m.absentIds.some((id) => !ids.has(id)))
           throw new HttpError(400, "تضم القائمة طالبًا خارج الفصل");
         const absent = new Set(m.absentIds);
-        if (before.students.some((s) => absent.has(s.id) && s.hasRecitation))
+        if (
+          before.students.some(
+            (s) => absent.has(s.id) && (s.hasRecitation || s.hasExam),
+          )
+        )
           throw new HttpError(
             409,
-            "يوجد تسميع مسجل لطالب اخترته غائبًا؛ راجع اختيارات الغياب",
+            "يوجد تسميع مسجل أو اختبار لطالب اخترته غائبًا؛ راجع اختيارات الغياب",
           );
         const session = await tx.dailySession.upsert({
           where: { halqaId_date: { halqaId, date: dayDate(m.date) } },
@@ -286,10 +299,7 @@ export async function attendanceOverview(
       });
       const classes = [];
       for (const h of ids) classes.push(await read(tx, actor, h.id, date, now));
-      classes.sort(
-        (a, b) =>
-          Number(a.confirmed) - Number(b.confirmed) || schoolClassCompare(a, b),
-      );
+      classes.sort(schoolClassCompare);
       return {
         date,
         today: calendarKey(now),

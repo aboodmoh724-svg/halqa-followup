@@ -62,7 +62,7 @@ export function RangeFields({
     onChange(next);
   }
   return (
-    <fieldset className="range-fields">
+    <fieldset className="range-fields" aria-label={title}>
       <legend>{title}</legend>
       <div className="range-grid">
         {(["start", "end"] as const).map((side) => (
@@ -70,6 +70,7 @@ export function RangeFields({
             <label>
               سورة {side === "start" ? "البداية" : "النهاية"}
               <select
+                aria-label={`سورة ${side === "start" ? "البداية" : "النهاية"}`}
                 value={value[`${side}Surah`]}
                 onChange={(e) => surahChange(side, Number(e.target.value))}
               >
@@ -88,6 +89,7 @@ export function RangeFields({
             <label>
               آية {side === "start" ? "البداية" : "النهاية"}
               <input
+                aria-label={`آية ${side === "start" ? "البداية" : "النهاية"}`}
                 required
                 type="number"
                 inputMode="numeric"

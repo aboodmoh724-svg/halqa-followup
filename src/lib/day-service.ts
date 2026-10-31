@@ -18,6 +18,11 @@ import { rangeSchema, pageAmount } from "./quran";
 import { readMemorySequences } from "./memorization-sequence";
 import { enrollmentIdsOnDate } from "./enrollment-history";
 import { suggestAssignment } from "./assignment-suggestions";
+import {
+  enforceExamProgression,
+  completionNotices,
+  examinedOnDate,
+} from "./exam-service";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
@@ -198,6 +203,13 @@ export async function getDay(
     });
     histories.set(currentEnrollment, days);
   }
+  const examNotices = await completionNotices(
+    db,
+    session.statuses
+      .filter((s) => !s.reviewOnly)
+      .map((s) => s.enrollment.studentId),
+    date,
+  );
   const memorySequences = await readMemorySequences(
     db,
     session.statuses.filter((s) => !s.reviewOnly).map((s) => s.enrollmentId),
@@ -214,6 +226,7 @@ export async function getDay(
     students: session.statuses.map((s) => ({
       enrollmentId: s.enrollmentId,
       memorySequence: memorySequences.get(s.enrollmentId),
+      examNotices: examNotices.get(s.enrollment.studentId) ?? [],
       reviewOnly: s.reviewOnly,
       suggestions: {
         memorization:
@@ -359,6 +372,18 @@ export async function mutateDay(
         throw new HttpError(404, "التسميع غير موجود لهذا الطالب في هذا اليوم");
       if (status.reviewOnly && entry.kind === "MEMORIZATION")
         throw new HttpError(409, "الطالب حافظ؛ مساره مراجعة فقط دون حفظ جديد");
+      if (entry.kind === "MEMORIZATION") {
+        const e = await tx.enrollment.findUniqueOrThrow({
+          where: { id: status.enrollmentId },
+        });
+        await enforceExamProgression(
+          tx,
+          e.studentId,
+          m.range,
+          (entry.masteryResult ?? entry.assessment) === "MASTERED",
+          m.date,
+        );
+      }
       const pages = pageAmount(m.range)!;
       await tx.recitationEntry.update({
         where: { id: entry.id },
@@ -417,6 +442,16 @@ export async function mutateDay(
         return;
       }
       if (m.kind === "MEMORIZATION") {
+        const e = await tx.enrollment.findUniqueOrThrow({
+          where: { id: status.enrollmentId },
+        });
+        await enforceExamProgression(
+          tx,
+          e.studentId,
+          m.range,
+          m.assessment === "MASTERED",
+          m.date,
+        );
         const previous = [...status.entries]
           .reverse()
           .find((e) => e.kind === "MEMORIZATION");
@@ -458,6 +493,18 @@ export async function mutateDay(
         const last = [...status.entries]
           .reverse()
           .find((e) => e.kind === "MEMORIZATION");
+        if (last && m.assessment === "MASTERED") {
+          const e = await tx.enrollment.findUniqueOrThrow({
+            where: { id: status.enrollmentId },
+          });
+          await enforceExamProgression(
+            tx,
+            e.studentId,
+            rangeSchema.parse(last),
+            true,
+            m.date,
+          );
+        }
         if (last)
           await tx.recitationEntry.update({
             where: { id: last.id },
@@ -573,10 +620,22 @@ export async function mutateDay(
       const attendanceChange =
         m.outcome === "ABSENT" ||
         (status.outcome === "ABSENT" && m.outcome === null);
-      if (m.outcome === "ABSENT" && status.entries.length)
+      const examPupil =
+        m.outcome === "ABSENT"
+          ? await tx.enrollment.findUniqueOrThrow({
+              where: { id: status.enrollmentId },
+              select: { studentId: true },
+            })
+          : null;
+      if (
+        m.outcome === "ABSENT" &&
+        (status.entries.length ||
+          (examPupil &&
+            (await examinedOnDate(tx, [examPupil.studentId], m.date)).size))
+      )
         throw new HttpError(
           409,
-          "يوجد تسميع اليوم؛ لا يمكن تسجيل الغياب بعد التسميع",
+          "يوجد تسميع اليوم أو اختبار مسجل؛ لا يمكن تسجيل الغياب بعده",
         );
       await tx.dailyStudentStatus.update({
         where: { id: status.id },

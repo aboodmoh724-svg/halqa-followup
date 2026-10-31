@@ -70,7 +70,7 @@ export default function StudentTransfer({
           setOpen(true);
         }}
       >
-        نقل الطالب إلى حلقة أخرى
+        نقل الطالب إلى فصل آخر
       </button>
     );
   const destination = options?.destinations.find((h) => h.id === target);
@@ -98,18 +98,18 @@ export default function StudentTransfer({
           {error}
         </p>
       )}
-      {!options && !error && <p role="status">جارٍ تحميل الحلقات…</p>}
+      {!options && !error && <p role="status">جارٍ تحميل الفصول…</p>}
       {options && (
         <>
           <p>من {options.sourceName}</p>
           <label>
-            الحلقة الجديدة
+            الفصل الجديد
             <select
               disabled={busy}
               value={target}
               onChange={(e) => setTarget(e.target.value)}
             >
-              <option value="">اختر الحلقة</option>
+              <option value="">اختر الفصل</option>
               {options.destinations.map((h) => (
                 <option key={h.id} value={h.id}>
                   {h.name} · {h.teacher.name}

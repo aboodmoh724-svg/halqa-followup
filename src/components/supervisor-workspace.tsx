@@ -15,6 +15,8 @@ import { academyName } from "@/lib/branding";
 import { assessmentLabels, type Assessment } from "@/lib/types";
 import type { SupervisorOverview } from "@/lib/supervisor-service";
 import SupervisorAttendance from "./supervisor-attendance";
+import StudentExams from "./student-exams";
+import SupervisorExams from "./supervisor-exams";
 import AcademyLogo from "./academy-logo";
 import StudentTransfer from "./student-transfer";
 import StudentHistory from "./student-history";
@@ -24,14 +26,15 @@ const states: Record<string, string> = {
   "not-started": "لم يبدأ التسجيل",
   progress: "جارٍ التسجيل",
   complete: "اكتمل التسجيل",
-  submitted: "أنهى يوم الحلقة",
+  submitted: "أنهى تسجيل الفصل",
 };
 const tabs = [
   { id: "today", label: "اليوم", Icon: CheckCheck },
-  { id: "classes", label: "الحلقات", Icon: Users },
+  { id: "classes", label: "الفصول", Icon: Users },
   { id: "alerts", label: "التنبيهات", Icon: CircleAlert },
   { id: "reports", label: "التقارير", Icon: ClipboardList },
   { id: "attendance", label: "الحضور", Icon: Users },
+  { id: "exams", label: "الاختبارات", Icon: CheckCheck },
 ] as const;
 const grade = (value: string | null) =>
   value ? assessmentLabels[value as Assessment] || "نتيجة سابقة" : "لم تُسجل";
@@ -143,14 +146,12 @@ export default function SupervisorWorkspace() {
         <div className="branded-heading">
           <AcademyLogo size={40} />
           <p className="eyebrow">{academyName}</p>
-          <h1>إشراف قسم القرآن</h1>
-          <p className="subtle">
-            أهلًا {data.supervisor.name} · {date}
-          </p>
+          <h1>لوحة الإدارة</h1>
+          <p className="subtle">أهلًا بالإدارة · {date}</p>
         </div>
         <button
           className="supervisor-icon"
-          aria-label="تسجيل خروج الإشراف"
+          aria-label="تسجيل خروج الإدارة"
           onClick={logout}
           disabled={busy}
         >
@@ -176,7 +177,7 @@ export default function SupervisorWorkspace() {
               else setClassId(null);
             }}
           >
-            ← {studentId ? selectedClass.name : "جميع الحلقات"}
+            ← {studentId ? selectedClass.name : "جميع الفصول"}
           </button>
           <div className="supervisor-heading">
             <div>
@@ -187,8 +188,15 @@ export default function SupervisorWorkspace() {
           </div>
           {student ? (
             <>
+              <StudentExams
+                key={`exams:${student.id}`}
+                halqaId={selectedClass.id}
+                enrollmentId={student.id}
+                supervisor
+                onChanged={() => void load()}
+              />
               <StudentTransfer
-                key={student.id}
+                key={`transfer:${student.id}`}
                 halqaId={selectedClass.id}
                 enrollmentId={student.id}
                 onTransferred={async (result) => {
@@ -198,7 +206,7 @@ export default function SupervisorWorkspace() {
                 }}
               />
               <StudentHistory
-                key={student.id}
+                key={`history:${student.id}`}
                 supervisor
                 halqaId={selectedClass.id}
                 enrollmentId={student.id}
@@ -264,8 +272,8 @@ export default function SupervisorWorkspace() {
             <>
               <section className="supervisor-intro">
                 <p className="eyebrow">متابعة اليوم</p>
-                <h2>كيف تسير الحلقات اليوم؟</h2>
-                <p>تابع اكتمال التسجيل، وافتح الحلقة أو سجل الطالب للتفاصيل.</p>
+                <h2>كيف يسير التسجيل اليوم؟</h2>
+                <p>تابع اكتمال التسجيل، وافتح الفصل أو سجل الطالب للتفاصيل.</p>
                 <div className="supervisor-totals">
                   <div>
                     <strong>
@@ -281,7 +289,7 @@ export default function SupervisorWorkspace() {
                           .length
                       }
                     </strong>
-                    <span>حلقات لم تبدأ</span>
+                    <span>فصول لم تبدأ</span>
                   </div>
                 </div>
               </section>
@@ -296,13 +304,13 @@ export default function SupervisorWorkspace() {
                       {data.alerts.length + data.recordingAlerts.length} حالات
                       تحتاج متابعة
                     </strong>
-                    <small>تسجيل الحلقات ونتائج الطلاب ومدى التسميع</small>
+                    <small>تسجيل الفصول ونتائج الطلاب ومدى التسميع</small>
                   </span>
                   <ChevronLeft size={19} />
                 </button>
               )}
               <div className="supervisor-heading">
-                <h2>الحلقات اليوم</h2>
+                <h2>الفصول اليوم</h2>
                 <button className="text-button" onClick={() => void load()}>
                   <RefreshCw size={16} /> تحديث
                 </button>
@@ -314,12 +322,12 @@ export default function SupervisorWorkspace() {
               <div className="supervisor-heading">
                 <div>
                   <p className="eyebrow">المعلمون والطلاب</p>
-                  <h2>الحلقات</h2>
+                  <h2>الفصول</h2>
                 </div>
-                <span>{data.classes.length} حلقات</span>
+                <span>{data.classes.length} فصول</span>
               </div>
               <label className="supervisor-search">
-                البحث عن حلقة أو معلم
+                البحث عن فصل أو معلم
                 <input
                   type="search"
                   value={search}
@@ -369,7 +377,7 @@ export default function SupervisorWorkspace() {
                 </button>
               ))}
               {!classCards.length && (
-                <p className="notice">لا توجد حلقات مطابقة.</p>
+                <p className="notice">لا توجد فصول مطابقة.</p>
               )}
             </div>
           )}
@@ -453,7 +461,7 @@ export default function SupervisorWorkspace() {
                   <div className="supervisor-empty">
                     <CheckCheck size={32} />
                     <h3>لا توجد حالات تستدعي التنبيه</h3>
-                    <p>تابع اكتمال تسجيل الحلقات من شاشة اليوم.</p>
+                    <p>تابع اكتمال تسجيل الفصول من شاشة اليوم.</p>
                   </div>
                 )}
               </div>
@@ -464,6 +472,7 @@ export default function SupervisorWorkspace() {
             </>
           )}
           {tab === "attendance" && <SupervisorAttendance />}
+          {tab === "exams" && <SupervisorExams />}
           {tab === "reports" && (
             <SupervisionReports
               today={data.date}
@@ -473,7 +482,7 @@ export default function SupervisorWorkspace() {
           )}
         </>
       )}
-      <nav className="supervisor-nav" aria-label="أقسام الإشراف">
+      <nav className="supervisor-nav" aria-label="أقسام الإدارة">
         {tabs.map(({ id, label, Icon }) => (
           <button
             key={id}

@@ -471,3 +471,5 @@
   margin-top: 16px;
 }
 .supervisor-nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+.supervisor-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.supervisor-nav button{padding-inline:2px;font-size:.68rem}
+.supervisor-shell .exam-confirm input{width:22px;flex:0 0 22px}.exam-panel textarea{width:100%;min-height:96px;box-sizing:border-box;border:1px solid #cfd8df;border-radius:12px;padding:12px}.exam-panel select{width:100%;min-height:48px}.exam-confirm{font-weight:400}

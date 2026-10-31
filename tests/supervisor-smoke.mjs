@@ -97,7 +97,7 @@ try {
   await page.getByLabel("رمز الدخول", { exact: true }).fill(code);
   await page.getByRole("button", { name: "دخول", exact: true }).click();
   await page
-    .getByRole("heading", { name: "الحلقات اليوم", exact: true })
+    .getByRole("heading", { name: "الفصول اليوم", exact: true })
     .waitFor();
   assert.equal(new URL(page.url()).pathname, "/");
   assert.equal((await context.request.get(base + "/api/halqas")).status(), 401);
@@ -145,10 +145,10 @@ try {
   }
   await page.reload();
   await page
-    .getByRole("heading", { name: "الحلقات اليوم", exact: true })
+    .getByRole("heading", { name: "الفصول اليوم", exact: true })
     .waitFor();
   await page
-    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("navigation", { name: "أقسام الإدارة" })
     .getByRole("button", { name: /التنبيهات/ })
     .click();
   await page
@@ -248,7 +248,7 @@ try {
     1,
   );
   await page
-    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("navigation", { name: "أقسام الإدارة" })
     .getByRole("button", { name: "التقارير", exact: true })
     .click();
   const report = page.getByRole("region", { name: "إصدار تقارير الإشراف" });
@@ -262,7 +262,7 @@ try {
     .getByLabel("من تاريخ", { exact: true })
     .fill(start.toISOString().slice(0, 10));
   await report.getByLabel("إلى تاريخ", { exact: true }).fill(date);
-  await report.getByLabel("٣. الحلقة", { exact: true }).selectOption(h.id);
+  await report.getByLabel("٣. الفصل", { exact: true }).selectOption(h.id);
   await report
     .getByRole("button", { name: "معاينة التقرير", exact: true })
     .click();
@@ -362,10 +362,7 @@ try {
   await report
     .getByRole("link", { name: "تنزيل التقرير PDF", exact: true })
     .waitFor();
-  assert.equal(
-    await report.getByLabel("٣. الحلقة", { exact: true }).count(),
-    0,
-  );
+  assert.equal(await report.getByLabel("٣. الفصل", { exact: true }).count(), 0);
   const unifiedDownload = report.getByRole("link", {
     name: "تنزيل التقرير PDF",
     exact: true,
@@ -434,10 +431,10 @@ try {
     });
   await page.reload();
   await page
-    .getByRole("heading", { name: "الحلقات اليوم", exact: true })
+    .getByRole("heading", { name: "الفصول اليوم", exact: true })
     .waitFor();
   await page
-    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("navigation", { name: "أقسام الإدارة" })
     .getByRole("button", { name: /التنبيهات/ })
     .click();
   await page
@@ -480,7 +477,7 @@ try {
     0,
   );
   await page
-    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("navigation", { name: "أقسام الإدارة" })
     .getByRole("button", { name: "التقارير", exact: true })
     .click();
   await report
@@ -488,7 +485,7 @@ try {
     .selectOption("excellent");
   await report.getByLabel("من تاريخ", { exact: true }).fill(date);
   await report.getByLabel("إلى تاريخ", { exact: true }).fill(date);
-  await report.getByLabel("٣. الحلقة", { exact: true }).selectOption(h.id);
+  await report.getByLabel("٣. الفصل", { exact: true }).selectOption(h.id);
   await report
     .getByRole("button", { name: "معاينة التقرير", exact: true })
     .click();
@@ -562,19 +559,19 @@ try {
     })
   ).map((x) => x.id);
   await page
-    .getByRole("navigation", { name: "أقسام الإشراف" })
-    .getByRole("button", { name: "الحلقات", exact: true })
+    .getByRole("navigation", { name: "أقسام الإدارة" })
+    .getByRole("button", { name: "الفصول", exact: true })
     .click();
   await page.getByRole("button", { name: new RegExp(h.name) }).click();
   await page.getByRole("button", { name: new RegExp(s.name) }).click();
   await page
-    .getByRole("button", { name: "نقل الطالب إلى حلقة أخرى", exact: true })
+    .getByRole("button", { name: "نقل الطالب إلى فصل آخر", exact: true })
     .click();
   const transfer = page.getByRole("region", {
     name: "نقل الطالب",
     exact: true,
   });
-  await transfer.getByLabel("الحلقة الجديدة").selectOption(transferTarget.id);
+  await transfer.getByLabel("الفصل الجديد").selectOption(transferTarget.id);
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     assert(
@@ -660,7 +657,7 @@ try {
   );
   assert.equal((await context.request.get(base + "/api/halqas")).status(), 401);
   await page
-    .getByRole("button", { name: "تسجيل خروج الإشراف", exact: true })
+    .getByRole("button", { name: "تسجيل خروج الإدارة", exact: true })
     .click();
   await page.getByLabel("رمز الدخول", { exact: true }).waitFor();
   assert.equal(

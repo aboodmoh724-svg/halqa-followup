@@ -49,6 +49,7 @@ export type EntryView = QuranRange & {
   pageMappingVersion: string | null;
 };
 export type StudentView = {
+  examNotices?: string[];
   memorySequence?: MemorySequenceView;
   reviewOnly?: boolean;
   suggestions?: {

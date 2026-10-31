@@ -74,3 +74,7 @@ The mobile supervision workspace is at `/` through the shared code login (the ol
 ## School attendance
 
 See [attendance workflow and import safeguards](docs/attendance.md). Attendance-only classes use the same login and a dedicated simple roster; the existing supervision workspace includes the school attendance tab.
+
+## Part completion and exams
+
+See [completion evidence, exam policy and supervision approval](docs/exams.md). This workflow does not issue certificates.
