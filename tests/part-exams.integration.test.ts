@@ -292,6 +292,46 @@ test(
       );
       view = await studentExamView(teacher, h.id, e.id, tuesday);
       assert(view.parts[0].canSubmit);
+      await mutateDay(
+        a.id,
+        h.id,
+        {
+          action: "status",
+          enrollmentId: e.id,
+          date: "2026-11-03",
+          outcome: "ABSENT",
+          note: "اختبار حارس الحضور",
+          carry: false,
+        },
+        tuesday,
+      );
+      const absentView = await studentExamView(teacher, h.id, e.id, tuesday);
+      assert(!absentView.parts[0].canSubmit);
+      await assert.rejects(
+        () =>
+          submitPartExam(
+            teacher,
+            h.id,
+            e.id,
+            payload(absentView.version, 30, q(20)),
+            tuesday,
+          ),
+        /الغياب/,
+      );
+      await mutateDay(
+        a.id,
+        h.id,
+        {
+          action: "status",
+          enrollmentId: e.id,
+          date: "2026-11-03",
+          outcome: null,
+          note: "حضر الطالب",
+          carry: false,
+        },
+        tuesday,
+      );
+      view = await studentExamView(teacher, h.id, e.id, tuesday);
       view = await submitPartExam(
         teacher,
         h.id,
@@ -301,6 +341,59 @@ test(
       );
       const second = view.parts[0].attempts[0];
       assert.equal(second.attempt, 2);
+      const presence = await db.dailyStudentStatus.findFirstOrThrow({
+        where: {
+          enrollmentId: e.id,
+          session: { date: new Date("2026-11-03T00:00:00Z") },
+        },
+      });
+      assert.equal(presence.attendance, "PRESENT");
+      assert.equal(presence.outcome, null);
+      assert.equal(presence.memorizationResult, null);
+      assert.equal(presence.reviewResult, null);
+      await assert.rejects(
+        () =>
+          mutateDay(
+            a.id,
+            h.id,
+            {
+              action: "status",
+              enrollmentId: e.id,
+              date: "2026-11-03",
+              outcome: "ABSENT",
+              note: "غير صحيح",
+              carry: false,
+            },
+            tuesday,
+          ),
+        /اختبار/,
+      );
+      const attendance = await import("../src/lib/attendance-service");
+      const attendanceView = await attendance.getAttendance(
+        teacher,
+        h.id,
+        "2026-11-03",
+        tuesday,
+      );
+      assert(attendanceView.students.find((s) => s.id === e.id)?.hasExam);
+      assert(
+        !attendanceView.students.find((s) => s.id === e.id)?.hasRecitation,
+      );
+      await assert.rejects(
+        () =>
+          attendance.confirmAttendance(
+            teacher,
+            h.id,
+            {
+              date: "2026-11-03",
+              version: attendanceView.version,
+              absentIds: [e.id],
+              requestKey: randomUUID(),
+            },
+            tuesday,
+          ),
+        /اختبار/,
+      );
       admin = await studentExamView(supervisor, h.id, e.id, tuesday);
       assert.equal(admin.parts[0].attempts[0].score, 80);
       const concurrent = await Promise.allSettled([

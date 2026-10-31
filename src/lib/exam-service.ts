@@ -295,8 +295,20 @@ export async function studentExamView(
       const e = (
         await loadExamEvidence(tx, [m.studentId], calendarKey(now))
       ).get(m.studentId)!;
+      const view = publicView(e, actor, m.reviewOnly, now);
+      if (actor.kind === "TEACHER") {
+        const presence = await tx.dailyStudentStatus.findFirst({
+          where: { enrollmentId, session: { date: dayDate(calendarKey(now)) } },
+          select: { outcome: true },
+        });
+        if (presence?.outcome === "ABSENT") {
+          view.readOnlyReason =
+            "الطالب مسجل غائبًا اليوم؛ ألغِ الغياب إذا حضر قبل تسجيل الاختبار.";
+          view.parts = view.parts.map((p) => ({ ...p, canSubmit: false }));
+        }
+      }
       return {
-        ...publicView(e, actor, m.reviewOnly, now),
+        ...view,
         studentName: m.student.name,
         halqaName: m.halqa.name,
         currentTeacherName: m.halqa.teacher.name,
@@ -397,7 +409,6 @@ export async function submitPartExam(
     const member = await membership(tx, actor, halqaId, enrollmentId);
     if (member.reviewOnly)
       throw new HttpError(409, "هذه الاختبارات لإتمام أجزاء الحفظ الجديد");
-    await tx.$queryRaw`SELECT id FROM "Student" WHERE id=${member.studentId} FOR UPDATE`;
     const replay = await tx.partExam.findUnique({
       where: { requestKey: m.requestKey },
     });
@@ -406,6 +417,23 @@ export async function submitPartExam(
         throw new HttpError(409, "طلب الاختبار مستخدم لبيانات أخرى");
       return;
     }
+    // Match attendance's lock order: class, class day, then pupil.
+    await tx.$queryRaw`SELECT id FROM "Halqa" WHERE id=${halqaId} FOR UPDATE`;
+    const day = await tx.dailySession.upsert({
+      where: { halqaId_date: { halqaId, date: dayDate(calendarKey(now)) } },
+      create: { halqaId, date: dayDate(calendarKey(now)) },
+      update: {},
+    });
+    await tx.$queryRaw`SELECT id FROM "DailySession" WHERE id=${day.id} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM "Student" WHERE id=${member.studentId} FOR UPDATE`;
+    const presence = await tx.dailyStudentStatus.findUnique({
+      where: { sessionId_enrollmentId: { sessionId: day.id, enrollmentId } },
+    });
+    if (presence?.outcome === "ABSENT")
+      throw new HttpError(
+        409,
+        "ألغِ الغياب أولًا إذا حضر الطالب قبل تسجيل الاختبار",
+      );
     const e = (
       await loadExamEvidence(tx, [member.studentId], calendarKey(now))
     ).get(member.studentId)!;
@@ -458,6 +486,17 @@ export async function submitPartExam(
         requestKey: m.requestKey,
         payloadHash,
       },
+    });
+    await tx.dailyStudentStatus.upsert({
+      where: { sessionId_enrollmentId: { sessionId: day.id, enrollmentId } },
+      create: {
+        sessionId: day.id,
+        enrollmentId,
+        halqaId,
+        reviewOnly: member.reviewOnly,
+        attendance: "PRESENT",
+      },
+      update: { attendance: "PRESENT" },
     });
   });
   return studentExamView(actor, halqaId, enrollmentId, now);
@@ -649,6 +688,29 @@ export async function examOverview(actor: ExamActor, now = new Date()) {
   );
 }
 export type ExamOverview = Awaited<ReturnType<typeof examOverview>>;
+
+export async function examinedOnDate(
+  tx: Tx,
+  studentIds: string[],
+  date: string,
+) {
+  const start = dayDate(date),
+    end = dayDate(date);
+  start.setUTCDate(start.getUTCDate() - 1);
+  end.setUTCDate(end.getUTCDate() + 2);
+  const rows = await tx.partExam.findMany({
+    where: {
+      studentId: { in: studentIds },
+      submittedAt: { gte: start, lt: end },
+    },
+    select: { studentId: true, submittedAt: true },
+  });
+  return new Set(
+    rows
+      .filter((r) => calendarKey(r.submittedAt) === date)
+      .map((r) => r.studentId),
+  );
+}
 
 export async function completionNotices(tx: Tx, ids: string[], date: string) {
   const evidence = await loadExamEvidence(tx, ids, date);

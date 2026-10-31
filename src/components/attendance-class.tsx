@@ -140,7 +140,11 @@ export default function AttendanceClass({
                 <span className="subtle">{i + 1}</span>
                 <span>
                   {s.name}
-                  {s.hasRecitation && <small>لديه تسميع مسجل اليوم</small>}
+                  {s.hasRecitation ? (
+                    <small>لديه تسميع مسجل اليوم</small>
+                  ) : s.hasExam ? (
+                    <small>لديه اختبار مسجل اليوم</small>
+                  ) : null}
                 </span>
                 <span className="attendance-check">
                   <input
@@ -150,7 +154,7 @@ export default function AttendanceClass({
                     disabled={
                       busy ||
                       !!data.readOnlyReason ||
-                      (s.hasRecitation && !absent.includes(s.id))
+                      ((s.hasRecitation || s.hasExam) && !absent.includes(s.id))
                     }
                     aria-describedby={
                       data.readOnlyReason

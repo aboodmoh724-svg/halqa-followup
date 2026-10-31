@@ -6,6 +6,7 @@ import { HttpError } from "./auth";
 import { dayDate, dayKey, nextAssignmentDay } from "./dates";
 import { rangeSchema, pageAmount } from "./quran";
 import { independentSummary } from "./types";
+import { examinedOnDate } from "./exam-service";
 const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -192,10 +193,15 @@ export async function correctStudent(
             data: { note: m.note.trim() },
           });
         if (m.action === "attendance") {
-          if (m.absent && s.entries.length)
+          if (
+            m.absent &&
+            (s.entries.length ||
+              (await examinedOnDate(tx, [s.enrollment.student.id], m.date))
+                .size)
+          )
             throw new HttpError(
               409,
-              "يوجد تسميع مسجل؛ لا يمكن تحويل اليوم إلى غياب",
+              "يوجد تسميع مسجل أو اختبار؛ لا يمكن تحويل اليوم إلى غياب",
             );
           await tx.dailyStudentStatus.update({
             where: { id: s.id },

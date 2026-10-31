@@ -499,6 +499,7 @@ export default function TeacherFlow() {
                     student.entries,
                     student.memorizationResult,
                     student.reviewResult,
+                    student.outcome,
                   ])}
                 />
               )}

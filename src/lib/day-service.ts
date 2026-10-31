@@ -18,7 +18,11 @@ import { rangeSchema, pageAmount } from "./quran";
 import { readMemorySequences } from "./memorization-sequence";
 import { enrollmentIdsOnDate } from "./enrollment-history";
 import { suggestAssignment } from "./assignment-suggestions";
-import { enforceExamProgression, completionNotices } from "./exam-service";
+import {
+  enforceExamProgression,
+  completionNotices,
+  examinedOnDate,
+} from "./exam-service";
 async function serial<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
@@ -616,10 +620,22 @@ export async function mutateDay(
       const attendanceChange =
         m.outcome === "ABSENT" ||
         (status.outcome === "ABSENT" && m.outcome === null);
-      if (m.outcome === "ABSENT" && status.entries.length)
+      const examPupil =
+        m.outcome === "ABSENT"
+          ? await tx.enrollment.findUniqueOrThrow({
+              where: { id: status.enrollmentId },
+              select: { studentId: true },
+            })
+          : null;
+      if (
+        m.outcome === "ABSENT" &&
+        (status.entries.length ||
+          (examPupil &&
+            (await examinedOnDate(tx, [examPupil.studentId], m.date)).size))
+      )
         throw new HttpError(
           409,
-          "يوجد تسميع اليوم؛ لا يمكن تسجيل الغياب بعد التسميع",
+          "يوجد تسميع اليوم أو اختبار مسجل؛ لا يمكن تسجيل الغياب بعده",
         );
       await tx.dailyStudentStatus.update({
         where: { id: status.id },
