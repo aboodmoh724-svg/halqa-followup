@@ -4,6 +4,7 @@ import { ClipboardList, Download } from "lucide-react";
 import type { SupervisionReport } from "@/lib/supervision-report";
 import { reportTitles, reportPeriod } from "@/lib/supervision-report-policy";
 import { reportNumber as formatPages } from "@/lib/report-format";
+import { reportDataNotice } from "@/lib/report-data-notice";
 type ClassOption = {
   id: string;
   name: string;
@@ -264,13 +265,12 @@ export default function SupervisionReports({
             </div>
             <span>{data.summary.students} طالب</span>
           </div>
-          <p className="notice">{data.criteria}</p>
-          {type === "support" && data.supportUnassessedCount > 0 && (
-            <p className="notice">
-              لم يُصنف {data.supportUnassessedCount} طالبًا لعدم كفاية بيانات
-              الأسبوع أو عدم تحديد الصف. نقص البيانات لا يعني ضعف الطالب.
+          {reportDataNotice(data) && (
+            <p className="notice report-data-warning" role="status">
+              {reportDataNotice(data)}
             </p>
           )}
+          <p className="notice">{data.criteria}</p>
           {type === "excellent" ? (
             <div className="supervision-report-totals">
               <div>
@@ -441,8 +441,9 @@ export default function SupervisionReports({
           )}
           {!data.rows.length && (
             <p className="supervisor-empty">
-              لا يوجد طلاب مطابقون للشروط في هذه الفترة. يمكنك تغيير الفترة أو
-              شروط التقرير.
+              {type === "support" && data.supportUnassessedCount > 0
+                ? "لا توجد حالات مثبتة في تقرير المتابعة، مع وجود طلاب لم تكف بياناتهم للتصنيف."
+                : "لا يوجد طلاب مطابقون للشروط في هذه الفترة. يمكنك تغيير الفترة أو شروط التقرير."}
             </p>
           )}
           {type !== "excellent" && shown < data.rows.length && (
