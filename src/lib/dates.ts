@@ -81,7 +81,7 @@ export function dayReadOnlyReason(
 ) {
   const window = dailyWindow(now, timezone);
   if (!isStudyDay(calendarKey(now, timezone)))
-    return "السبت والأحد عطلة؛ يبدأ التسجيل يوم الاثنين الساعة 6 صباحًا.";
+    return "التسجيل متوقف يومي السبت والأحد لأنهما عطلة. يمكنك عرض السجلات فقط؛ يُفتح التسجيل يوم الاثنين الساعة 6 صباحًا بتوقيت المدرسة.";
   if (date !== window.date)
     return "انتهى وقت إدخال هذا التقرير. يبدأ يوم جديد الساعة 6 صباحًا.";
   return window.writable

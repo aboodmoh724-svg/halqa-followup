@@ -1,16 +1,27 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { AttendanceView } from "@/lib/attendance-service";
+export type AttendanceTransport = {
+  load: () => Promise<AttendanceView>;
+  save: (input: {
+    date: string;
+    version: string;
+    absentIds: string[];
+    requestKey: string;
+  }) => Promise<AttendanceView>;
+};
 export default function AttendanceClass({
   halqaId,
   date,
   supervisor = false,
   onSaved,
+  transport,
 }: {
   halqaId: string;
   date?: string;
   supervisor?: boolean;
   onSaved?: () => void;
+  transport?: AttendanceTransport;
 }) {
   const [data, setData] = useState<AttendanceView | null>(null),
     [absent, setAbsent] = useState<string[]>([]),
@@ -23,6 +34,16 @@ export default function AttendanceClass({
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
+        if (transport) {
+          const d = await transport.load();
+          if (signal?.aborted) return;
+          setData(d);
+          setAbsent(
+            d.students.filter((s) => s.state === "ABSENT").map((s) => s.id),
+          );
+          setError("");
+          return;
+        }
         const r = await fetch(endpoint + (date ? `?date=${date}` : ""), {
           cache: "no-store",
           signal,
@@ -42,7 +63,7 @@ export default function AttendanceClass({
         if ((e as Error).name !== "AbortError") setError((e as Error).message);
       }
     },
-    [endpoint, date],
+    [endpoint, date, transport],
   );
   useEffect(() => {
     const c = new AbortController();
@@ -57,15 +78,22 @@ export default function AttendanceClass({
     setError("");
     setMessage("");
     try {
+      const input = {
+        date: data.date,
+        version: data.version,
+        absentIds: absent,
+        requestKey: crypto.randomUUID(),
+      };
+      if (transport) {
+        setData(await transport.save(input));
+        setMessage("تم تأكيد وإرسال الحضور والغياب");
+        onSaved?.();
+        return;
+      }
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          date: data.date,
-          version: data.version,
-          absentIds: absent,
-          requestKey: crypto.randomUUID(),
-        }),
+        body: JSON.stringify(input),
       });
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
@@ -108,7 +136,18 @@ export default function AttendanceClass({
             </p>
           )}
           {data.readOnlyReason ? (
-            <p className="notice">{data.readOnlyReason}</p>
+            <div
+              className="attendance-closed"
+              role="status"
+              id="attendance-closed-reason"
+            >
+              <strong>التسجيل متوقف لهذا اليوم</strong>
+              <p>{data.readOnlyReason}</p>
+              <span>
+                خيارات الغياب والإرسال غير متاحة. يمكنك تجربة الخطوات بأسماء
+                وهمية من زر التجربة.
+              </span>
+            </div>
           ) : (
             <p>حدد الغائبين فقط، ثم أكد أن بقية الطلاب حاضرون.</p>
           )}
@@ -143,6 +182,11 @@ export default function AttendanceClass({
                       !!data.readOnlyReason ||
                       (s.hasRecitation && !absent.includes(s.id))
                     }
+                    aria-describedby={
+                      data.readOnlyReason
+                        ? "attendance-closed-reason"
+                        : undefined
+                    }
                     onChange={(e) => {
                       setMessage("");
                       setAbsent((prev) =>
@@ -162,7 +206,11 @@ export default function AttendanceClass({
               {message}
             </p>
           )}
-          {!data.readOnlyReason && (
+          {data.readOnlyReason ? (
+            <button className="secondary space" disabled>
+              التسجيل متوقف · العرض فقط
+            </button>
+          ) : (
             <button
               className="primary space"
               disabled={busy || !data.students.length}
