@@ -164,7 +164,7 @@ export default function SupervisorExams() {
           {!data.students.length && (
             <p className="notice">
               لا توجد اختبارات أو إتمامات موثقة حاليًا. اعتماد المحفوظ السابق
-              متاح من الحلقة ← الطالب، ولا تُفترض أجزاء مكتملة من مجموع الصفحات.
+              متاح من الفصل ← الطالب، ولا تُفترض أجزاء مكتملة من مجموع الصفحات.
             </p>
           )}
           <button className="text-button" onClick={() => void load()}>

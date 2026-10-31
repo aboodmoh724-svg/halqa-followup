@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "./db";
 import { HttpError } from "./auth";
 import { calendarKey, dayDate, dailyWindow } from "./dates";
+import { schoolClassCompare } from "./report-format";
 const excluded = () =>
   (process.env.SUPERVISOR_EXCLUDED_HALQA_IDS ?? "")
     .split(",")
@@ -76,7 +77,7 @@ export async function getTransferOptions(
         studentName: v.source.student.name,
         sourceName: v.source.halqa.name,
         reviewOnly: v.source.reviewOnly,
-        destinations,
+        destinations: destinations.sort(schoolClassCompare),
       };
     },
     { isolationLevel: "RepeatableRead" },

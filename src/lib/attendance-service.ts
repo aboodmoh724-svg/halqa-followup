@@ -299,10 +299,7 @@ export async function attendanceOverview(
       });
       const classes = [];
       for (const h of ids) classes.push(await read(tx, actor, h.id, date, now));
-      classes.sort(
-        (a, b) =>
-          Number(a.confirmed) - Number(b.confirmed) || schoolClassCompare(a, b),
-      );
+      classes.sort(schoolClassCompare);
       return {
         date,
         today: calendarKey(now),

@@ -97,7 +97,7 @@ try {
   );
   await login(supCode);
   await page
-    .getByRole("heading", { name: "الحلقات اليوم", exact: true })
+    .getByRole("heading", { name: "الفصول اليوم", exact: true })
     .waitFor();
   await page.getByRole("button", { name: new RegExp(h.name) }).click();
   await page.getByRole("button", { name: new RegExp(pupil.name) }).click();
@@ -240,7 +240,7 @@ try {
   await logout();
   await login(supCode);
   await page
-    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("navigation", { name: "أقسام الإدارة" })
     .getByRole("button", { name: "الاختبارات", exact: true })
     .click();
   const list = page.getByRole("region", {

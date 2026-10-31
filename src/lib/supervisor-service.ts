@@ -9,6 +9,7 @@ import {
 import { enrollmentIdsOnDate } from "./enrollment-history";
 import { latestMemoryGap } from "./supervision-gaps";
 import { completionNotices } from "./exam-service";
+import { schoolClassCompare } from "./report-format";
 import { reportIssues, type StudentView } from "./types";
 import { totalPages, rangeSchema, type QuranRange } from "./quran";
 export type SupervisorAlert = {
@@ -93,6 +94,7 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
     },
     orderBy: { name: "asc" },
   });
+  halqas.sort(schoolClassCompare);
   // Follow the pupil across classes for streaks and sequence advice, while class
   // totals keep each original day's class rather than relabelling history.
   const pupilHistory = await db.dailyStudentStatus.findMany({

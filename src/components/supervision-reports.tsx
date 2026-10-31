@@ -184,15 +184,15 @@ export default function SupervisionReports({
         </div>
         {type === "comprehensive" ? (
           <p className="notice">
-            ملف PDF واحد: ملخص الفترة ثم جميع الحلقات وطلابها. الأرقام إنجليزية،
+            ملف PDF واحد: ملخص الفترة ثم جميع الفصول وطلابها. الأرقام إنجليزية،
             والتقرير الموحد عرضي.
           </p>
         ) : (
           <>
             <label>
-              ٣. الحلقة
+              ٣. الفصل
               <select
-                aria-label="٣. الحلقة"
+                aria-label="٣. الفصل"
                 value={halqaId}
                 required={type === "student"}
                 onChange={(e) => {
@@ -201,7 +201,7 @@ export default function SupervisionReports({
                 }}
               >
                 <option value="">
-                  {type === "student" ? "اختر الحلقة" : "جميع الحلقات"}
+                  {type === "student" ? "اختر الفصل" : "جميع الفصول"}
                 </option>
                 {classes.map((h) => (
                   <option value={h.id} key={h.id}>
@@ -242,7 +242,7 @@ export default function SupervisionReports({
         {type === "excellent" && (
           <p className="notice">
             أعلى 3 طلاب في الحفظ الجديد المتقن وأعلى 3 في المراجعة المتقنة من كل
-            حلقة، بحسب الصفحات. قائمتان مستقلتان؛ دون شروط نسبة أو غياب.
+            فصل، بحسب الصفحات. قائمتان مستقلتان؛ دون شروط نسبة أو غياب.
           </p>
         )}
         {error && (
@@ -279,7 +279,7 @@ export default function SupervisionReports({
               </div>
               <div>
                 <strong>{data.classes.length}</strong>
-                <span>حلقات</span>
+                <span>فصول</span>
               </div>
               <div>
                 <strong>

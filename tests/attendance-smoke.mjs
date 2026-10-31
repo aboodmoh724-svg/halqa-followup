@@ -217,7 +217,7 @@ try {
   await page.getByRole("button", { name: "خروج", exact: true }).click();
   await login(supCode);
   await page
-    .getByRole("navigation", { name: "أقسام الإشراف" })
+    .getByRole("navigation", { name: "أقسام الإدارة" })
     .getByRole("button", { name: "الحضور", exact: true })
     .click();
   const overview = page.getByRole("region", {
