@@ -1,27 +1,16 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { AttendanceView } from "@/lib/attendance-service";
-export type AttendanceTransport = {
-  load: () => Promise<AttendanceView>;
-  save: (input: {
-    date: string;
-    version: string;
-    absentIds: string[];
-    requestKey: string;
-  }) => Promise<AttendanceView>;
-};
 export default function AttendanceClass({
   halqaId,
   date,
   supervisor = false,
   onSaved,
-  transport,
 }: {
   halqaId: string;
   date?: string;
   supervisor?: boolean;
   onSaved?: () => void;
-  transport?: AttendanceTransport;
 }) {
   const [data, setData] = useState<AttendanceView | null>(null),
     [absent, setAbsent] = useState<string[]>([]),
@@ -34,16 +23,6 @@ export default function AttendanceClass({
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        if (transport) {
-          const d = await transport.load();
-          if (signal?.aborted) return;
-          setData(d);
-          setAbsent(
-            d.students.filter((s) => s.state === "ABSENT").map((s) => s.id),
-          );
-          setError("");
-          return;
-        }
         const r = await fetch(endpoint + (date ? `?date=${date}` : ""), {
           cache: "no-store",
           signal,
@@ -63,7 +42,7 @@ export default function AttendanceClass({
         if ((e as Error).name !== "AbortError") setError((e as Error).message);
       }
     },
-    [endpoint, date, transport],
+    [endpoint, date],
   );
   useEffect(() => {
     const c = new AbortController();
@@ -84,12 +63,6 @@ export default function AttendanceClass({
         absentIds: absent,
         requestKey: crypto.randomUUID(),
       };
-      if (transport) {
-        setData(await transport.save(input));
-        setMessage("تم تأكيد وإرسال الحضور والغياب");
-        onSaved?.();
-        return;
-      }
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -143,10 +116,7 @@ export default function AttendanceClass({
             >
               <strong>التسجيل متوقف لهذا اليوم</strong>
               <p>{data.readOnlyReason}</p>
-              <span>
-                خيارات الغياب والإرسال غير متاحة. يمكنك تجربة الخطوات بأسماء
-                وهمية من زر التجربة.
-              </span>
+              <span>خيارات الغياب والإرسال غير متاحة في هذا اليوم.</span>
             </div>
           ) : (
             <p>حدد الغائبين فقط، ثم أكد أن بقية الطلاب حاضرون.</p>

@@ -2,9 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AttendanceOverview } from "@/lib/attendance-service";
 import AttendanceClass from "./attendance-class";
-import AttendancePractice from "./attendance-practice";
 export default function SupervisorAttendance() {
-  const [practice, setPractice] = useState(false);
   const [data, setData] = useState<AttendanceOverview | null>(null),
     [date, setDate] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
@@ -37,13 +35,9 @@ export default function SupervisorAttendance() {
       clearInterval(timer);
     };
   }, [load]);
-  if (practice) return <AttendancePractice onExit={() => setPractice(false)} />;
   return (
     <section aria-label="متابعة الحضور والغياب" className="stack">
       <h2>الحضور والغياب</h2>
-      <button className="secondary" onClick={() => setPractice(true)}>
-        تجربة الحضور بأسماء وهمية
-      </button>
       {error && (
         <p className="notice error" role="alert">
           {error}
