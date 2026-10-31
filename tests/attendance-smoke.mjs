@@ -130,6 +130,96 @@ try {
     { headers: { origin: "https://foreign.example" }, data: {} },
   );
   assert.equal(bad.status(), 403);
+  // A weekend notice must explain disabled controls. Practice reuses the form
+  // but must never POST attendance, even when submitting and correcting it.
+  const endpoint = base + "/api/halqas/" + hs[1].id + "/attendance";
+  await page.route(endpoint, async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+    await route.fulfill({
+      response,
+      json: {
+        ...data,
+        readOnlyReason:
+          "التسجيل متوقف يومي السبت والأحد لأنهما عطلة. يُفتح التسجيل يوم الاثنين الساعة 6 صباحًا.",
+      },
+    });
+  });
+  await page.reload();
+  await region.getByText("التسجيل متوقف لهذا اليوم", { exact: true }).waitFor();
+  assert(await region.getByRole("checkbox").first().isDisabled());
+  await page
+    .getByRole("button", { name: "تجربة الحضور بأسماء وهمية", exact: true })
+    .click();
+  const practice = page.getByRole("region", {
+    name: "تجربة الحضور الآمنة",
+    exact: true,
+  });
+  const preview = practice.getByRole("region", {
+    name: "معاينة الإشراف التجريبية",
+    exact: true,
+  });
+  await practice
+    .getByText("وضع التجربة · لا يُحفظ شيء في سجلات المدرسة", { exact: true })
+    .waitFor();
+  let writes = 0;
+  const watchWrites = (request) => {
+    if (request.method() === "POST" && request.url().includes("/api/"))
+      writes++;
+  };
+  page.on("request", watchWrites);
+  await practice
+    .getByRole("checkbox", { name: "غياب طالب تجريبي 1", exact: true })
+    .check();
+  await practice
+    .getByRole("button", { name: "تأكيد وإرسال الحضور", exact: true })
+    .click();
+  await preview
+    .getByRole("listitem")
+    .filter({ hasText: "طالب تجريبي 1" })
+    .waitFor();
+  await widths();
+  await page.screenshot({
+    path: "work/smoke/attendance-practice.png",
+    fullPage: true,
+  });
+  await practice
+    .getByRole("checkbox", { name: "غياب طالب تجريبي 1", exact: true })
+    .uncheck();
+  await practice
+    .getByRole("button", { name: "تعديل وإرسال الحضور", exact: true })
+    .click();
+  await preview.getByText("جميع الطلاب حاضرون.", { exact: true }).waitFor();
+  await practice
+    .getByRole("button", { name: "إعادة التجربة من البداية", exact: true })
+    .click();
+  await preview.getByText("لم يُرسل الحضور بعد", { exact: true }).waitFor();
+  assert.equal(writes, 0);
+  page.off("request", watchWrites);
+  assert.equal(
+    await db.attendanceEdit.count({ where: { halqaId: hs[1].id } }),
+    0,
+  );
+  assert.equal(
+    await db.dailySession.count({ where: { halqaId: hs[1].id } }),
+    0,
+  );
+  await practice
+    .getByRole("button", {
+      name: "إنهاء التجربة والعودة للسجل الفعلي",
+      exact: true,
+    })
+    .click();
+  await region.getByText("التسجيل متوقف لهذا اليوم", { exact: true }).waitFor();
+  await page.screenshot({
+    path: "work/smoke/attendance-weekend.png",
+    fullPage: true,
+  });
+  await page.unroute(endpoint);
+  await page.reload();
+  await region
+    .getByRole("heading", { name: hs[1].name, exact: true })
+    .waitFor();
   await region
     .getByRole("checkbox", { name: "غياب " + pupils[2].name, exact: true })
     .check();

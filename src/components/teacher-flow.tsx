@@ -1,5 +1,5 @@
 "use client";
-import AttendanceClass from "./attendance-class";
+import AttendancePanel from "./attendance-panel";
 import {
   BookOpen,
   RotateCcw,
@@ -343,7 +343,7 @@ export default function TeacherFlow() {
             خروج
           </button>
         </header>
-        <AttendanceClass
+        <AttendancePanel
           key={attendanceHalqa.id}
           halqaId={attendanceHalqa.id}
         />
@@ -908,7 +908,7 @@ export default function TeacherFlow() {
           </div>
           <details className="attendance-panel">
             <summary>حضور اليوم · تحديد الغائبين وإرسال</summary>
-            <AttendanceClass
+            <AttendancePanel
               halqaId={day.halqaId}
               date={day.date}
               onSaved={() => void loadHalqa(day.halqaId)}
