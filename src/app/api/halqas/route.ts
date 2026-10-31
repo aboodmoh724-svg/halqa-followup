@@ -7,7 +7,10 @@ export async function GET() {
       where: { id },
       select: {
         name: true,
-        halqas: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+        halqas: {
+          select: { id: true, name: true, attendanceOnly: true },
+          orderBy: { name: "asc" },
+        },
       },
     });
     return Response.json(teacher, { headers: { "Cache-Control": "no-store" } });

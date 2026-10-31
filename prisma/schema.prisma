@@ -37,6 +37,9 @@ model LoginBucket {
 model Halqa {
   id String @id @default(cuid())
   name String
+  attendanceOnly Boolean @default(false)
+  attendanceStartsOn DateTime? @db.Date
+  attendanceEdits AttendanceEdit[]
   teacherId String
   teacher Teacher @relation(fields: [teacherId], references: [id])
   enrollments Enrollment[]
@@ -70,6 +73,8 @@ model DailySession {
   date DateTime @db.Date
   halqa Halqa @relation(fields: [halqaId], references: [id])
   closedAt DateTime?
+  attendanceConfirmedAt DateTime?
+  attendanceRecordedBy String?
   statuses DailyStudentStatus[]
   @@unique([halqaId, date])
   @@unique([id, halqaId])
@@ -82,6 +87,7 @@ model DailyStudentStatus {
   session DailySession @relation(fields: [sessionId, halqaId], references: [id, halqaId])
   enrollment Enrollment @relation(fields: [enrollmentId, halqaId], references: [id, halqaId])
   outcome Outcome?
+  attendance String?
   // Snapshot the study track so later enrollment changes do not rewrite history.
   reviewOnly Boolean @default(false)
   memorizationResult String?
@@ -91,6 +97,22 @@ model DailyStudentStatus {
   entries RecitationEntry[]
   @@unique([sessionId, enrollmentId])
   @@index([enrollmentId, halqaId])
+}
+
+model AttendanceEdit {
+  id String @id @default(cuid())
+  halqaId String
+  halqa Halqa @relation(fields: [halqaId], references: [id])
+  date DateTime @db.Date
+  actorKind String
+  actorId String
+  actorName String
+  requestKey String @unique
+  payloadHash String
+  before Json
+  after Json
+  createdAt DateTime @default(now())
+  @@index([halqaId, date, createdAt])
 }
 enum RangeDirection {
   FORWARD

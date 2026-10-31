@@ -14,6 +14,7 @@ import {
 import { academyName } from "@/lib/branding";
 import { assessmentLabels, type Assessment } from "@/lib/types";
 import type { SupervisorOverview } from "@/lib/supervisor-service";
+import SupervisorAttendance from "./supervisor-attendance";
 import AcademyLogo from "./academy-logo";
 import StudentTransfer from "./student-transfer";
 import StudentHistory from "./student-history";
@@ -30,6 +31,7 @@ const tabs = [
   { id: "classes", label: "الحلقات", Icon: Users },
   { id: "alerts", label: "التنبيهات", Icon: CircleAlert },
   { id: "reports", label: "التقارير", Icon: ClipboardList },
+  { id: "attendance", label: "الحضور", Icon: Users },
 ] as const;
 const grade = (value: string | null) =>
   value ? assessmentLabels[value as Assessment] || "نتيجة سابقة" : "لم تُسجل";
@@ -461,6 +463,7 @@ export default function SupervisorWorkspace() {
               </p>
             </>
           )}
+          {tab === "attendance" && <SupervisorAttendance />}
           {tab === "reports" && (
             <SupervisionReports
               today={data.date}

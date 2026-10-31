@@ -470,3 +470,4 @@
   width: 100%;
   margin-top: 16px;
 }
+.supervisor-nav{grid-template-columns:repeat(5,minmax(0,1fr))}
