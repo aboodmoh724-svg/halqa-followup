@@ -198,7 +198,7 @@ export default function SupervisorWorkspace() {
                 onChanged={() => void load()}
               />
               <StudentTransfer
-                key={student.id}
+                key={`transfer:${student.id}`}
                 halqaId={selectedClass.id}
                 enrollmentId={student.id}
                 onTransferred={async (result) => {
@@ -208,7 +208,7 @@ export default function SupervisorWorkspace() {
                 }}
               />
               <StudentHistory
-                key={student.id}
+                key={`history:${student.id}`}
                 supervisor
                 halqaId={selectedClass.id}
                 enrollmentId={student.id}

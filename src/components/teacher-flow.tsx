@@ -490,7 +490,11 @@ export default function TeacherFlow() {
                   key={student.enrollmentId}
                   halqaId={day.halqaId}
                   enrollmentId={student.enrollmentId}
-                  onChanged={() => void loadHalqa(day.halqaId)}
+                  onChanged={() => {
+                    void api<DayView>(`/api/halqas/${day.halqaId}`)
+                      .then(setDay)
+                      .catch((error) => notify((error as Error).message, true));
+                  }}
                   refreshToken={JSON.stringify([
                     student.entries,
                     student.memorizationResult,
