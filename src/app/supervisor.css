@@ -471,3 +471,4 @@
   margin-top: 16px;
 }
 .supervisor-nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+.supervisor-nav{grid-template-columns:repeat(6,minmax(0,1fr))}.supervisor-nav button{padding-inline:2px;font-size:.68rem}

@@ -1,5 +1,6 @@
 "use client";
 import AttendanceClass from "./attendance-class";
+import StudentExams from "./student-exams";
 import {
   BookOpen,
   RotateCcw,
@@ -483,6 +484,19 @@ export default function TeacherFlow() {
                 <p className="notice closed small-space">
                   {day.readOnlyReason || "تم إنهاء الحلقة لهذا اليوم"}
                 </p>
+              )}
+              {!student.reviewOnly && (
+                <StudentExams
+                  key={student.enrollmentId}
+                  halqaId={day.halqaId}
+                  enrollmentId={student.enrollmentId}
+                  onChanged={() => void loadHalqa(day.halqaId)}
+                  refreshToken={JSON.stringify([
+                    student.entries,
+                    student.memorizationResult,
+                    student.reviewResult,
+                  ])}
+                />
               )}
               <div className="assignment-today">
                 <h3>واجب اليوم</h3>
@@ -976,6 +990,9 @@ export default function TeacherFlow() {
                   {s.reviewOnly && (
                     <span className="subtle block">حافظ · مراجعة فقط</span>
                   )}
+                  {s.examNotices?.length ? (
+                    <span className="exam-badge block">{s.examNotices[0]}</span>
+                  ) : null}
                   <span className="subtle block">
                     {s.entries.length
                       ? `${s.entries.length} تسميع اليوم`

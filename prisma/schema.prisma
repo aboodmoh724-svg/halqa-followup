@@ -50,6 +50,71 @@ model Student {
   id String @id @default(cuid())
   name String
   enrollments Enrollment[]
+  memorizationBaseline MemorizationBaseline?
+  exams PartExam[]
+}
+
+// Prior school-approved memorization is not recitation activity or earned pages.
+model MemorizationBaseline {
+  id String @id @default(cuid())
+  studentId String @unique
+  student Student @relation(fields: [studentId], references: [id])
+  ranges Json
+  note String
+  supervisorId String
+  supervisorName String
+  createdAt DateTime @default(now())
+  requestKey String @unique
+  payloadHash String
+}
+
+enum PartExamState {
+  SUBMITTED
+  APPROVED
+  RETRY
+}
+model PartExam {
+  id String @id @default(cuid())
+  studentId String
+  student Student @relation(fields: [studentId], references: [id])
+  juz Int
+  attempt Int
+  teacherId String
+  teacherName String
+  halqaId String
+  enrollmentId String
+  questions Json
+  scoreHalfPoints Int
+  policyVersion String
+  evidenceHash String
+  evidenceSnapshot Json
+  state PartExamState @default(SUBMITTED)
+  submittedAt DateTime @default(now())
+  decidedAt DateTime?
+  decidedById String?
+  decidedByName String?
+  decisionNote String @default("")
+  retryOn DateTime? @db.Date
+  updatedAt DateTime @updatedAt
+  requestKey String @unique
+  payloadHash String
+  actions ExamAction[]
+  @@unique([studentId, juz, attempt])
+  @@index([state, submittedAt])
+}
+model ExamAction {
+  id String @id @default(cuid())
+  examId String
+  exam PartExam @relation(fields: [examId], references: [id])
+  supervisorId String
+  supervisorName String
+  action String
+  before Json
+  after Json
+  requestKey String @unique
+  payloadHash String
+  createdAt DateTime @default(now())
+  @@index([examId, createdAt])
 }
 model Enrollment {
   id String @id @default(cuid())

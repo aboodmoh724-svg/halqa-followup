@@ -8,11 +8,12 @@ import {
 } from "./dates";
 import { enrollmentIdsOnDate } from "./enrollment-history";
 import { latestMemoryGap } from "./supervision-gaps";
+import { completionNotices } from "./exam-service";
 import { reportIssues, type StudentView } from "./types";
 import { totalPages, rangeSchema, type QuranRange } from "./quran";
 export type SupervisorAlert = {
   id: string;
-  kind: "absence" | "memory" | "review" | "incomplete" | "sequence";
+  kind: "absence" | "memory" | "review" | "incomplete" | "sequence" | "exam";
   halqaId: string;
   enrollmentId: string;
   studentName: string;
@@ -386,6 +387,29 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
             : [];
         })
       : [];
+  const notices = await completionNotices(
+    db,
+    halqas.flatMap((h) =>
+      h.enrollments
+        .filter((e) => e.active && !e.reviewOnly)
+        .map((e) => e.studentId),
+    ),
+    date,
+  );
+  for (const h of halqas)
+    for (const e of h.enrollments.filter((e) => e.active && !e.reviewOnly)) {
+      for (const [i, message] of (notices.get(e.studentId) ?? []).entries())
+        alerts.push({
+          id: `${e.id}:exam:${i}`,
+          kind: "exam",
+          halqaId: h.id,
+          enrollmentId: e.id,
+          studentName: e.student.name,
+          halqaName: h.name,
+          message,
+          dates: [],
+        });
+    }
   return {
     date,
     classes: mapped,

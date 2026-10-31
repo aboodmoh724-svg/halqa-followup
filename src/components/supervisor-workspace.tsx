@@ -15,6 +15,8 @@ import { academyName } from "@/lib/branding";
 import { assessmentLabels, type Assessment } from "@/lib/types";
 import type { SupervisorOverview } from "@/lib/supervisor-service";
 import SupervisorAttendance from "./supervisor-attendance";
+import StudentExams from "./student-exams";
+import SupervisorExams from "./supervisor-exams";
 import AcademyLogo from "./academy-logo";
 import StudentTransfer from "./student-transfer";
 import StudentHistory from "./student-history";
@@ -32,6 +34,7 @@ const tabs = [
   { id: "alerts", label: "التنبيهات", Icon: CircleAlert },
   { id: "reports", label: "التقارير", Icon: ClipboardList },
   { id: "attendance", label: "الحضور", Icon: Users },
+  { id: "exams", label: "الاختبارات", Icon: CheckCheck },
 ] as const;
 const grade = (value: string | null) =>
   value ? assessmentLabels[value as Assessment] || "نتيجة سابقة" : "لم تُسجل";
@@ -187,6 +190,13 @@ export default function SupervisorWorkspace() {
           </div>
           {student ? (
             <>
+              <StudentExams
+                key={`exams:${student.id}`}
+                halqaId={selectedClass.id}
+                enrollmentId={student.id}
+                supervisor
+                onChanged={() => void load()}
+              />
               <StudentTransfer
                 key={student.id}
                 halqaId={selectedClass.id}
@@ -464,6 +474,7 @@ export default function SupervisorWorkspace() {
             </>
           )}
           {tab === "attendance" && <SupervisorAttendance />}
+          {tab === "exams" && <SupervisorExams />}
           {tab === "reports" && (
             <SupervisionReports
               today={data.date}
