@@ -846,3 +846,4 @@ h3 {
 
 .branded-heading{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:10px}.branded-heading>.academy-logo{grid-column:1;grid-row:1/span 4;margin:0}.branded-heading>:not(.academy-logo){grid-column:2}
 .supervision-preview .supervisor-report h4{margin:1rem 0 .5rem}.supervision-preview ol{list-style:decimal;padding-inline-start:1.5rem}.supervision-preview li{padding:.4rem 0}
+.report-data-warning{border:1px solid #bb8b3d;border-inline-start:4px solid #a77625;background:#fff6e4;color:#72501d;font-weight:600}

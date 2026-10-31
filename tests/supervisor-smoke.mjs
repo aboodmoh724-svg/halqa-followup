@@ -334,7 +334,7 @@ try {
   await report
     .getByRole("button", { name: "معاينة التقرير", exact: true })
     .click();
-  await report.getByText(/لم يُصنف .*طالبًا لعدم كفاية بيانات/).waitFor();
+  await report.getByText(/بيانات غير كافية للتصنيف/).waitFor();
   const supportLink = report.getByRole("link", {
     name: "تنزيل التقرير PDF",
     exact: true,

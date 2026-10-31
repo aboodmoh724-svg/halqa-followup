@@ -41,7 +41,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run db:seed
+      - run: node --import tsx --import ./tests/school-clock.mjs prisma/seed.ts
       - name: Start production server for mobile smoke test
         run: |
           mkdir -p work/smoke

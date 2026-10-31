@@ -9,7 +9,7 @@
     "start:test": "node --import ./tests/school-clock.mjs node_modules/next/dist/bin/next start",
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit",
-    "test": "node --import ./tests/school-clock.mjs node_modules/tsx/dist/cli.mjs --test --test-concurrency=1 tests/*.test.ts",
+    "test": "node --import tsx --import ./tests/school-clock.mjs --test --test-concurrency=1 tests/*.test.ts",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "format": "prettier --write src tests",
