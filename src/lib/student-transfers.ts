@@ -17,7 +17,7 @@ async function membership(
   halqaId: string,
 ) {
   const source = await tx.enrollment.findFirst({
-    where: { id, halqaId },
+    where: { id, halqaId, halqa: { attendanceOnly: false } },
     include: { student: true, halqa: { select: { name: true } } },
   });
   if (!source || excluded().includes(halqaId))
@@ -64,7 +64,10 @@ export async function getTransferOptions(
       )
         throw new HttpError(409, "تغيرت حلقة الطالب؛ حدّث قائمة الحلقات");
       const destinations = await tx.halqa.findMany({
-        where: { id: { notIn: [halqaId, ...excluded()] } },
+        where: {
+          attendanceOnly: false,
+          id: { notIn: [halqaId, ...excluded()] },
+        },
         select: { id: true, name: true, teacher: { select: { name: true } } },
         orderBy: { name: "asc" },
       });
@@ -144,7 +147,11 @@ export async function transferStudent(
       throw new HttpError(409, "تغيرت حلقة الطالب؛ أعد فتح النقل");
     if (m.targetHalqaId === halqaId || excluded().includes(m.targetHalqaId))
       throw new HttpError(400, "اختر حلقة أخرى من الحلقات المتاحة");
-    if (!(await tx.halqa.findUnique({ where: { id: m.targetHalqaId } })))
+    if (
+      !(await tx.halqa.findUnique({
+        where: { id: m.targetHalqaId, attendanceOnly: false },
+      }))
+    )
       throw new HttpError(404, "الحلقة الجديدة غير موجودة");
     const previousTarget = await tx.enrollment.findUnique({
       where: {
@@ -222,6 +229,11 @@ export async function transferStudent(
       data: { active: false },
     });
     let movedSessionId: string | null = null;
+    if (window.writable)
+      await tx.dailySession.updateMany({
+        where: { halqaId, date: cutoff },
+        data: { attendanceConfirmedAt: null, attendanceRecordedBy: null },
+      });
     if (window.writable) {
       const destination = await tx.dailySession.upsert({
         where: { halqaId_date: { halqaId: m.targetHalqaId, date: cutoff } },
@@ -246,7 +258,11 @@ export async function transferStudent(
       // Joining an already submitted class requires its teacher to review the new roster.
       await tx.dailySession.update({
         where: { id: destination.id },
-        data: { closedAt: null },
+        data: {
+          closedAt: null,
+          attendanceConfirmedAt: null,
+          attendanceRecordedBy: null,
+        },
       });
     }
     if (assignments.length)

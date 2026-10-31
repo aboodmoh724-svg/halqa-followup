@@ -49,7 +49,12 @@ async function read(
   date: string,
 ) {
   const status = await tx.dailyStudentStatus.findFirst({
-    where: { halqaId, enrollmentId, session: { date: dayDate(date) } },
+    where: {
+      enrollment: { halqa: { attendanceOnly: false } },
+      halqaId,
+      enrollmentId,
+      session: { date: dayDate(date) },
+    },
     include: {
       entries: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
       session: true,
@@ -195,6 +200,7 @@ export async function correctStudent(
           await tx.dailyStudentStatus.update({
             where: { id: s.id },
             data: {
+              attendance: m.absent ? "ABSENT" : "PRESENT",
               outcome: m.absent
                 ? "ABSENT"
                 : independentSummary(

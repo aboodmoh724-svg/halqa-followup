@@ -47,6 +47,7 @@ export async function getSupervisionReport(raw: unknown) {
           ? await tx.enrollment.findFirst({
               where: {
                 id: query.enrollmentId,
+                halqa: { attendanceOnly: false },
                 halqaId: {
                   notIn: excluded,
                   ...(query.halqaId ? { equals: query.halqaId } : {}),
@@ -59,6 +60,7 @@ export async function getSupervisionReport(raw: unknown) {
         throw new HttpError(404, "الطالب غير موجود في الحلقة المحددة");
       const classes = await tx.halqa.findMany({
         where: {
+          attendanceOnly: false,
           id: {
             notIn: excluded,
             ...(query.halqaId &&

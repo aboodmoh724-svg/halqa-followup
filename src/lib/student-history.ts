@@ -69,7 +69,11 @@ export async function getStudentHistory(
 ): Promise<StudentHistory> {
   const query = historyQuery.parse(raw);
   const enrollment = await db.enrollment.findFirst({
-    where: { id: enrollmentId, halqaId, halqa: { teacherId } },
+    where: {
+      id: enrollmentId,
+      halqaId,
+      halqa: { teacherId, attendanceOnly: false },
+    },
     include: { student: true, halqa: true },
   });
   if (!enrollment) throw new HttpError(404, "الطالب غير موجود في حلقاتك");

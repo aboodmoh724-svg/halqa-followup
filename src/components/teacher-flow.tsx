@@ -1,4 +1,5 @@
 "use client";
+import AttendanceClass from "./attendance-class";
 import {
   BookOpen,
   RotateCcw,
@@ -32,7 +33,10 @@ import {
   type Outcome,
   type StudentView,
 } from "@/lib/types";
-type Teacher = { name: string; halqas: { id: string; name: string }[] };
+type Teacher = {
+  name: string;
+  halqas: { id: string; name: string; attendanceOnly: boolean }[];
+};
 function studentSearchKey(text: string) {
   return text
     .normalize("NFKC")
@@ -63,6 +67,10 @@ function Badge({ outcome }: { outcome: Outcome | null }) {
 }
 export default function TeacherFlow() {
   const [teacher, setTeacher] = useState<Teacher | null>(null);
+  const [attendanceHalqa, setAttendanceHalqa] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [day, setDay] = useState<DayView | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "student" | "summary">("list");
@@ -92,7 +100,18 @@ export default function TeacherFlow() {
     if (messageTimer.current) clearTimeout(messageTimer.current);
     messageTimer.current = setTimeout(() => setMessage(null), 6000);
   }
-  async function loadHalqa(id: string) {
+  async function loadHalqa(id: string, attendanceOnly = false) {
+    if (attendanceOnly) {
+      setAttendanceHalqa({
+        id,
+        name:
+          teacher?.halqas.find((h) => h.id === id)?.name ?? "الحضور والغياب",
+      });
+      setDay(null);
+      setLoading(false);
+      return;
+    }
+    setAttendanceHalqa(null);
     setLoading(true);
     try {
       const data = await api<DayView>(`/api/halqas/${id}`);
@@ -144,7 +163,8 @@ export default function TeacherFlow() {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
       setTeacher(data);
-      if (data.halqas.length === 1) await loadHalqa(data.halqas[0].id);
+      if (data.halqas.length === 1)
+        await loadHalqa(data.halqas[0].id, data.halqas[0].attendanceOnly);
     } catch (e) {
       setLoginError((e as Error).message);
     } finally {
@@ -162,7 +182,8 @@ export default function TeacherFlow() {
       })
       .then(async (data) => {
         setTeacher(data);
-        if (data?.halqas.length === 1) await loadHalqa(data.halqas[0].id);
+        if (data?.halqas.length === 1)
+          await loadHalqa(data.halqas[0].id, data.halqas[0].attendanceOnly);
       })
       .catch((error) => {
         if (error.name !== "AbortError") setLoginError(error.message);
@@ -202,6 +223,7 @@ export default function TeacherFlow() {
       await api("/api/logout", {});
       setTeacher(null);
       setDay(null);
+      setAttendanceHalqa(null);
       setView("list");
     } catch (e) {
       notify((e as Error).message, true);
@@ -312,6 +334,29 @@ export default function TeacherFlow() {
         <p className="login-footer">حفظٌ متقن · متابعةٌ أيسر</p>
       </main>
     );
+  if (attendanceHalqa)
+    return (
+      <main className="shell">
+        <header className="header">
+          <AcademyLogo size={40} />
+          <button className="text-button" onClick={logout}>
+            خروج
+          </button>
+        </header>
+        <AttendanceClass
+          key={attendanceHalqa.id}
+          halqaId={attendanceHalqa.id}
+        />
+        {teacher.halqas.length > 1 && (
+          <button
+            className="secondary space"
+            onClick={() => setAttendanceHalqa(null)}
+          >
+            اختيار فصل آخر
+          </button>
+        )}
+      </main>
+    );
   if (!day)
     return (
       <main className="shell">
@@ -331,7 +376,7 @@ export default function TeacherFlow() {
               className="student-row"
               disabled={loading}
               key={h.id}
-              onClick={() => loadHalqa(h.id)}
+              onClick={() => loadHalqa(h.id, h.attendanceOnly)}
             >
               {h.name}
               <span className="chevron">‹</span>
@@ -861,6 +906,14 @@ export default function TeacherFlow() {
               خروج
             </button>
           </div>
+          <details className="attendance-panel">
+            <summary>حضور اليوم · تحديد الغائبين وإرسال</summary>
+            <AttendanceClass
+              halqaId={day.halqaId}
+              date={day.date}
+              onSaved={() => void loadHalqa(day.halqaId)}
+            />
+          </details>
           <div className="card">
             <div className="flex justify-between gap-3">
               <p>متابعة اليوم</p>

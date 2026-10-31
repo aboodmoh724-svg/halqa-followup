@@ -13,7 +13,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "format": "prettier --write src tests",
-    "test:browser": "node --env-file-if-exists=.env --import ./tests/school-clock.mjs tests/browser-smoke.mjs && node --env-file-if-exists=.env --import ./tests/school-clock.mjs tests/supervisor-smoke.mjs"
+    "test:browser": "node --env-file-if-exists=.env --import ./tests/school-clock.mjs tests/browser-smoke.mjs && node --env-file-if-exists=.env --import ./tests/school-clock.mjs tests/supervisor-smoke.mjs && node --env-file-if-exists=.env --import ./tests/school-clock.mjs tests/attendance-smoke.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

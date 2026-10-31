@@ -45,7 +45,7 @@ export async function ensureDay(
   return serial(async (tx) => {
     const roster = await enrollmentIdsOnDate(tx, date, halqaId);
     const halqa = await tx.halqa.findFirst({
-      where: { id: halqaId, teacherId },
+      where: { id: halqaId, teacherId, attendanceOnly: false },
       include: { enrollments: { where: { id: { in: [...roster] } } } },
     });
     if (!halqa) throw new HttpError(404, "الحلقة غير موجودة");
@@ -107,7 +107,11 @@ export async function getDay(
   date = dayKey(),
 ): Promise<DayView> {
   const session = await db.dailySession.findFirst({
-    where: { halqaId, date: dayDate(date), halqa: { teacherId } },
+    where: {
+      halqaId,
+      date: dayDate(date),
+      halqa: { teacherId, attendanceOnly: false },
+    },
     include: {
       halqa: { include: { teacher: true } },
       statuses: {
@@ -577,7 +581,12 @@ export async function mutateDay(
       await tx.dailyStudentStatus.update({
         where: { id: status.id },
         data: {
-          ...(attendanceChange ? { outcome: m.outcome } : {}),
+          ...(attendanceChange
+            ? {
+                outcome: m.outcome,
+                attendance: m.outcome === "ABSENT" ? "ABSENT" : "PRESENT",
+              }
+            : {}),
           note: m.note,
           ...(status.outcome === "ABSENT" && m.outcome === null
             ? { memorizationResult: null, reviewResult: null }
@@ -585,56 +594,12 @@ export async function mutateDay(
         },
       });
       if (m.outcome === "ABSENT") {
-        const today = await tx.assignment.findUnique({
-          where: {
-            enrollmentId_dueDate: {
-              enrollmentId: m.enrollmentId,
-              dueDate: dayDate(m.date),
-            },
-          },
-        });
-        if (
-          today &&
-          (status.reviewOnly
-            ? today.review
-            : today.memorization || today.review)
-        ) {
-          const where = {
-            enrollmentId_dueDate: {
-              enrollmentId: m.enrollmentId,
-              dueDate: dayDate(nextDay(m.date)),
-            },
-          };
-          const tomorrow = await tx.assignment.findUnique({ where });
-          const memory =
-            !status.reviewOnly &&
-            !tomorrow?.memorization &&
-            !tomorrow?.memorizationManual
-              ? today.memorization
-              : null;
-          const review =
-            !tomorrow?.review && !tomorrow?.reviewManual ? today.review : null;
-          if (memory || review)
-            await tx.assignment.upsert({
-              where,
-              update: {
-                ...(memory
-                  ? { memorization: memory, autoMemorizationStatusId: null }
-                  : {}),
-                ...(review ? { review, autoReviewStatusId: null } : {}),
-                carriedFromId: tomorrow?.carriedFromId ?? today.id,
-              },
-              create: {
-                enrollmentId: m.enrollmentId,
-                dueDate: dayDate(nextDay(m.date)),
-                memorization: memory ?? Prisma.DbNull,
-                review: review ?? Prisma.DbNull,
-                note: today.note,
-                imageName: today.imageName,
-                carriedFromId: today.id,
-              },
-            });
-        }
+        await carryAbsentAssignment(
+          tx,
+          m.enrollmentId,
+          m.date,
+          status.reviewOnly,
+        );
       }
     }
     if (m.action === "assignment") {
@@ -691,4 +656,58 @@ export async function mutateDay(
     }
   });
   return getDay(teacherId, halqaId, m.date);
+}
+
+export async function carryAbsentAssignment(
+  tx: Prisma.TransactionClient,
+  enrollmentId: string,
+  date: string,
+  reviewOnly: boolean,
+) {
+  const today = await tx.assignment.findUnique({
+    where: {
+      enrollmentId_dueDate: {
+        enrollmentId: enrollmentId,
+        dueDate: dayDate(date),
+      },
+    },
+  });
+  if (
+    today &&
+    (reviewOnly ? today.review : today.memorization || today.review)
+  ) {
+    const where = {
+      enrollmentId_dueDate: {
+        enrollmentId: enrollmentId,
+        dueDate: dayDate(nextDay(date)),
+      },
+    };
+    const tomorrow = await tx.assignment.findUnique({ where });
+    const memory =
+      !reviewOnly && !tomorrow?.memorization && !tomorrow?.memorizationManual
+        ? today.memorization
+        : null;
+    const review =
+      !tomorrow?.review && !tomorrow?.reviewManual ? today.review : null;
+    if (memory || review)
+      await tx.assignment.upsert({
+        where,
+        update: {
+          ...(memory
+            ? { memorization: memory, autoMemorizationStatusId: null }
+            : {}),
+          ...(review ? { review, autoReviewStatusId: null } : {}),
+          carriedFromId: tomorrow?.carriedFromId ?? today.id,
+        },
+        create: {
+          enrollmentId: enrollmentId,
+          dueDate: dayDate(nextDay(date)),
+          memorization: memory ?? Prisma.DbNull,
+          review: review ?? Prisma.DbNull,
+          note: today.note,
+          imageName: today.imageName,
+          carriedFromId: today.id,
+        },
+      });
+  }
 }

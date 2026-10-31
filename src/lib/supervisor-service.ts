@@ -63,7 +63,7 @@ export async function getSupervisorOverview(date = dayKey(), now = new Date()) {
     .map((x) => x.trim())
     .filter(Boolean);
   const halqas = await db.halqa.findMany({
-    where: { id: { notIn: excluded } },
+    where: { attendanceOnly: false, id: { notIn: excluded } },
     select: {
       id: true,
       name: true,

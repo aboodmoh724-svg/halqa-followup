@@ -70,3 +70,7 @@ TEST_DATABASE_URL="postgresql://.../halqa_test" npm test
 ## Supervision
 
 The mobile supervision workspace is at `/` through the shared code login (the old `/supervisor` URL redirects there), with separate accounts and read-only access to classes and student history. Provisioning, alert definitions and same-day teacher corrections are documented in [docs/supervision.md](docs/supervision.md).
+
+## School attendance
+
+See [attendance workflow and import safeguards](docs/attendance.md). Attendance-only classes use the same login and a dedicated simple roster; the existing supervision workspace includes the school attendance tab.
