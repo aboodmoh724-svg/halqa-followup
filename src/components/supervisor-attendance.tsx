@@ -2,7 +2,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AttendanceOverview } from "@/lib/attendance-service";
 import AttendanceClass from "./attendance-class";
-export default function SupervisorAttendance() {
+export default function SupervisorAttendance({
+  onTransferred,
+}: {
+  onTransferred: () => Promise<void>;
+}) {
   const [data, setData] = useState<AttendanceOverview | null>(null),
     [date, setDate] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
@@ -72,7 +76,11 @@ export default function SupervisorAttendance() {
                 halqaId={selected}
                 date={data.date}
                 supervisor
+                allowTransfer={data.date === data.today}
                 onSaved={() => void load()}
+                onTransferred={async () => {
+                  await Promise.all([load(), onTransferred()]);
+                }}
               />
             </>
           ) : (

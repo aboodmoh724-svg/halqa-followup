@@ -5,6 +5,7 @@ import { db } from "./db";
 import { HttpError } from "./auth";
 import { calendarKey, dayDate, dailyWindow } from "./dates";
 import { schoolClassCompare } from "./report-format";
+import { attendanceState } from "./attendance-service";
 const excluded = () =>
   (process.env.SUPERVISOR_EXCLUDED_HALQA_IDS ?? "")
     .split(",")
@@ -18,8 +19,11 @@ async function membership(
   halqaId: string,
 ) {
   const source = await tx.enrollment.findFirst({
-    where: { id, halqaId, halqa: { attendanceOnly: false } },
-    include: { student: true, halqa: { select: { name: true } } },
+    where: { id, halqaId },
+    include: {
+      student: true,
+      halqa: { select: { name: true, attendanceOnly: true } },
+    },
   });
   if (!source || excluded().includes(halqaId))
     throw new HttpError(404, "الطالب غير موجود في الحلقة");
@@ -66,16 +70,21 @@ export async function getTransferOptions(
         throw new HttpError(409, "تغيرت حلقة الطالب؛ حدّث قائمة الحلقات");
       const destinations = await tx.halqa.findMany({
         where: {
-          attendanceOnly: false,
           id: { notIn: [halqaId, ...excluded()] },
         },
-        select: { id: true, name: true, teacher: { select: { name: true } } },
+        select: {
+          id: true,
+          name: true,
+          attendanceOnly: true,
+          teacher: { select: { name: true } },
+        },
         orderBy: { name: "asc" },
       });
       return {
         version: v.version,
         studentName: v.source.student.name,
         sourceName: v.source.halqa.name,
+        sourceAttendanceOnly: v.source.halqa.attendanceOnly,
         reviewOnly: v.source.reviewOnly,
         destinations: destinations.sort(schoolClassCompare),
       };
@@ -148,12 +157,12 @@ export async function transferStudent(
       throw new HttpError(409, "تغيرت حلقة الطالب؛ أعد فتح النقل");
     if (m.targetHalqaId === halqaId || excluded().includes(m.targetHalqaId))
       throw new HttpError(400, "اختر حلقة أخرى من الحلقات المتاحة");
-    if (
-      !(await tx.halqa.findUnique({
-        where: { id: m.targetHalqaId, attendanceOnly: false },
-      }))
-    )
-      throw new HttpError(404, "الحلقة الجديدة غير موجودة");
+    const targetClass = await tx.halqa.findUnique({
+      where: { id: m.targetHalqaId },
+    });
+    if (!targetClass) throw new HttpError(404, "الحلقة الجديدة غير موجودة");
+    const acrossPrograms =
+      v.source.halqa.attendanceOnly !== targetClass.attendanceOnly;
     const previousTarget = await tx.enrollment.findUnique({
       where: {
         studentId_halqaId: {
@@ -170,20 +179,25 @@ export async function transferStudent(
           include: { entries: true, session: true },
         })
       : null;
-    const assignments = await tx.assignment.findMany({
-      where: { enrollmentId, dueDate: { gte: cutoff } },
-      orderBy: { dueDate: "asc" },
-    });
+    const assignments =
+      targetClass.attendanceOnly || acrossPrograms
+        ? []
+        : await tx.assignment.findMany({
+            where: { enrollmentId, dueDate: { gte: cutoff } },
+            orderBy: { dueDate: "asc" },
+          });
+    const targetToday =
+      previousTarget && window.writable
+        ? await tx.dailyStudentStatus.findFirst({
+            where: {
+              enrollmentId: previousTarget.id,
+              session: { date: cutoff },
+            },
+            select: { id: true },
+          })
+        : null;
     if (previousTarget) {
-      if (
-        window.writable &&
-        (await tx.dailyStudentStatus.findFirst({
-          where: {
-            enrollmentId: previousTarget.id,
-            session: { date: cutoff },
-          },
-        }))
-      )
+      if (!acrossPrograms && targetToday)
         throw new HttpError(
           409,
           "يوجد سجل آخر لهذا اليوم في الحلقة الجديدة؛ راجعه قبل النقل",
@@ -245,7 +259,7 @@ export async function transferStudent(
         .filter((id): id is string => !!id)
         .sort())
         await tx.$queryRaw`SELECT id FROM "DailySession" WHERE id = ${id} FOR UPDATE`;
-      if (today) {
+      if (today && !acrossPrograms) {
         await tx.dailyStudentStatus.update({
           where: { id: today.id },
           data: {
@@ -255,6 +269,21 @@ export async function transferStudent(
           },
         });
         movedSessionId = destination.id;
+      }
+      if (acrossPrograms && !targetToday) {
+        const state = attendanceState(today ?? undefined);
+        if (state) {
+          await tx.dailyStudentStatus.create({
+            data: {
+              sessionId: destination.id,
+              halqaId: m.targetHalqaId,
+              enrollmentId: target.id,
+              reviewOnly: target.reviewOnly,
+              attendance: state,
+              outcome: state === "ABSENT" ? "ABSENT" : null,
+            },
+          });
+        }
       }
       // Joining an already submitted class requires its teacher to review the new roster.
       await tx.dailySession.update({
@@ -290,7 +319,7 @@ export async function transferStudent(
         after: json({
           target,
           sourceActive: false,
-          movedStatusId: today?.id ?? null,
+          movedStatusId: movedSessionId ? today?.id : null,
           movedSessionId,
           assignmentIds: assignments.map((a) => a.id),
         }),

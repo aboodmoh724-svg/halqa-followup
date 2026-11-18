@@ -1,22 +1,28 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { AttendanceView } from "@/lib/attendance-service";
+import StudentTransfer from "./student-transfer";
 export default function AttendanceClass({
   halqaId,
   date,
   supervisor = false,
   onSaved,
+  allowTransfer = false,
+  onTransferred,
 }: {
   halqaId: string;
   date?: string;
   supervisor?: boolean;
   onSaved?: () => void;
+  allowTransfer?: boolean;
+  onTransferred?: () => Promise<void>;
 }) {
   const [data, setData] = useState<AttendanceView | null>(null),
     [absent, setAbsent] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [transferId, setTransferId] = useState("");
   const endpoint = supervisor
     ? `/api/supervisor/halqas/${halqaId}/attendance`
     : `/api/halqas/${halqaId}/attendance`;
@@ -204,6 +210,38 @@ export default function AttendanceClass({
           >
             تحديث القائمة
           </button>
+          {supervisor && allowTransfer && data.students.length > 0 && (
+            <div className="record-homework">
+              <label>
+                اختيار طالب للنقل
+                <select
+                  value={transferId}
+                  disabled={busy}
+                  onChange={(e) => setTransferId(e.target.value)}
+                >
+                  <option value="">اختر الطالب</option>
+                  {data.students.map((student) => (
+                    <option key={student.id} value={student.id}>
+                      {student.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {transferId &&
+                data.students.some((student) => student.id === transferId) && (
+                  <StudentTransfer
+                    key={transferId}
+                    halqaId={halqaId}
+                    enrollmentId={transferId}
+                    onTransferred={async () => {
+                      setTransferId("");
+                      await Promise.all([load(), onTransferred?.()]);
+                      setMessage("تم نقل الطالب مع الحفاظ على سجله");
+                    }}
+                  />
+                )}
+            </div>
+          )}
         </>
       )}
     </section>
