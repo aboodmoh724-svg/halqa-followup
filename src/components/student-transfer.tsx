@@ -12,6 +12,7 @@ export default function StudentTransfer({
   onTransferred: (result: {
     halqaId: string;
     enrollmentId: string;
+    attendanceOnly: boolean;
   }) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false),
@@ -54,7 +55,12 @@ export default function StudentTransfer({
       });
       const body = await r.json();
       if (!r.ok) throw Error(body.error);
-      await onTransferred(body);
+      await onTransferred({
+        ...body,
+        attendanceOnly: options.destinations.some(
+          (h) => h.id === target && h.attendanceOnly,
+        ),
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -118,9 +124,13 @@ export default function StudentTransfer({
             </select>
           </label>
           <p className="subtle">
-            يبدأ النقل فور التأكيد. ينتقل تسجيل اليوم وواجب اليوم وما بعده،
-            ويبقى السجل السابق محفوظًا. مسار الطالب يبقى{" "}
-            {options.reviewOnly ? "مراجعة فقط" : "حفظ ومراجعة"}.
+            يبدأ النقل فور التأكيد.{" "}
+            {destination &&
+            options.sourceAttendanceOnly !== destination.attendanceOnly
+              ? "تظهر حالة الحضور في الفصل الجديد، وتبقى تقارير القرآن والواجبات في فصول القرآن."
+              : options.sourceAttendanceOnly
+                ? "ينتقل حضور اليوم، ويبقى السجل السابق محفوظًا."
+                : "ينتقل تسجيل اليوم وواجب اليوم وما بعده، ويبقى السجل السابق محفوظًا."}
           </p>
           {destination && (
             <p className="notice">

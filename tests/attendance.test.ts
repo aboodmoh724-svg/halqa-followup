@@ -291,22 +291,7 @@ test(
       const overview = await getSupervisorOverview(date, now);
       assert(!overview.classes.some((c) => c.id === p.id));
       const opt = await getTransferOptions(h.id, es[0].id);
-      assert(!opt.destinations.some((d) => d.id === p.id));
-      await assert.rejects(
-        () =>
-          transferStudent(
-            supervisor.id,
-            h.id,
-            es[0].id,
-            {
-              targetHalqaId: p.id,
-              version: opt.version,
-              requestKey: randomUUID(),
-            },
-            now,
-          ),
-        /الحلقة/,
-      );
+      assert(opt.destinations.some((d) => d.id === p.id && d.attendanceOnly));
       const moved = await transferStudent(
         supervisor.id,
         h.id,

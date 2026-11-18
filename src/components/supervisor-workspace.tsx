@@ -201,8 +201,18 @@ export default function SupervisorWorkspace() {
                 enrollmentId={student.id}
                 onTransferred={async (result) => {
                   await load();
-                  openStudent(result.halqaId, result.enrollmentId);
-                  setSuccess("تم نقل الطالب مع الحفاظ على سجله وواجبه");
+                  if (result.attendanceOnly) {
+                    setClassId(null);
+                    setStudentId(null);
+                    setTab("attendance");
+                  } else {
+                    openStudent(result.halqaId, result.enrollmentId);
+                  }
+                  setSuccess(
+                    result.attendanceOnly
+                      ? "تم نقل الطالب مع الحفاظ على سجله"
+                      : "تم نقل الطالب مع الحفاظ على سجله وواجبه",
+                  );
                 }}
               />
               <StudentHistory
@@ -471,7 +481,9 @@ export default function SupervisorWorkspace() {
               </p>
             </>
           )}
-          {tab === "attendance" && <SupervisorAttendance />}
+          {tab === "attendance" && (
+            <SupervisorAttendance onTransferred={load} />
+          )}
           {tab === "exams" && <SupervisorExams />}
           {tab === "reports" && (
             <SupervisionReports

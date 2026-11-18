@@ -14,7 +14,7 @@ test(
       { getStudentHistory } = await import("../src/lib/student-history"),
       { enrollmentIdsOnDate } = await import("../src/lib/enrollment-history");
     const teachers = await Promise.all(
-      [0, 1, 2].map((i) =>
+      [0, 1, 2, 3, 4].map((i) =>
         db.teacher.create({
           data: {
             name: `transfer teacher ${i}`,
@@ -27,7 +27,11 @@ test(
     const hs = await Promise.all(
       teachers.map((t, i) =>
         db.halqa.create({
-          data: { name: `transfer class ${i}`, teacherId: t.id },
+          data: {
+            name: `transfer class ${i}`,
+            teacherId: t.id,
+            attendanceOnly: i >= 3,
+          },
         }),
       ),
     );
@@ -485,6 +489,62 @@ test(
       assert.equal(
         (audit.after as { sourceActive: boolean }).sourceActive,
         false,
+      );
+      const quran = await db.enrollment.findFirstOrThrow({
+        where: { studentId: pupils[0].id, active: true },
+        include: {
+          dailyStatuses: { where: { session: { date: dayDate(date) } } },
+        },
+      });
+      const optionsForPrep = await getTransferOptions(quran.halqaId, quran.id);
+      assert(
+        optionsForPrep.destinations.some(
+          (h) => h.id === hs[3].id && h.attendanceOnly,
+        ),
+      );
+      const prep = await move(quran.id, quran.halqaId, hs[3].id);
+      const prepStatus = await db.dailyStudentStatus.findFirstOrThrow({
+        where: {
+          enrollmentId: prep.enrollmentId,
+          session: { date: dayDate(date) },
+        },
+        include: { entries: true },
+      });
+      assert.equal(prepStatus.attendance, "PRESENT");
+      assert.equal(prepStatus.entries.length, 0);
+      assert(quran.dailyStatuses.length);
+      assert.equal(
+        await db.recitationEntry.count({
+          where: { dailyStatusId: quran.dailyStatuses[0].id },
+        }),
+        2,
+      );
+      assert.equal(
+        await db.assignment.count({
+          where: { enrollmentId: prep.enrollmentId },
+        }),
+        0,
+      );
+      const otherPrep = await move(prep.enrollmentId, hs[3].id, hs[4].id);
+      assert.equal(
+        (
+          await db.dailyStudentStatus.findUniqueOrThrow({
+            where: { id: prepStatus.id },
+          })
+        ).enrollmentId,
+        otherPrep.enrollmentId,
+      );
+      const returnToQuran = await move(
+        otherPrep.enrollmentId,
+        hs[4].id,
+        quran.halqaId,
+      );
+      assert.equal(returnToQuran.enrollmentId, quran.id);
+      assert.equal(
+        await db.dailyStudentStatus.count({
+          where: { enrollmentId: quran.id, session: { date: dayDate(date) } },
+        }),
+        1,
       );
     } finally {
       await db.studentTransfer.deleteMany({
